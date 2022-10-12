@@ -1,0 +1,12 @@
+# lectures
+l*/
+# experiments
+tmp*
+# editor
+.vscode/
+# compilation
+*.so
+# cache
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
