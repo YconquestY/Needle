@@ -1,0 +1,7 @@
+# license
+LICENSE
+# editor
+.vscode/
+# cache
+.ipynb_checkpoints/
+__pycache__/
