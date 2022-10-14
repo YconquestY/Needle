@@ -1,0 +1,9 @@
+# homework
+hw*/
+# lectures
+l*/
+# editor
+.vscode/
+# cache
+.ipynb_checkpoint/
+__pycache__/
