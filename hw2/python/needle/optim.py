@@ -1,4 +1,5 @@
 """Optimization module"""
+from re import U
 import needle as ndl
 import numpy as np
 
@@ -27,14 +28,14 @@ class SGD(Optimizer):
 
     def step(self):
         ### BEGIN YOUR SOLUTION
-        for param in self.params:
-            param_id = id(param)
-            grad = param.grad                \
-                   if param_id not in self.u \
-                   else self.momentum * self.u[param_id] + \
-                        (1. - self.momentum) * param.grad
-            param = Tensor((1 - self.lr * self.weight_decay) * param.data - self.lr * grad)
-            self.u[param_id] = grad
+        for p in self.params:
+            if p.grad is None:
+                continue
+            p_id = id(p)
+            grad = (1. - self.momentum) * (p.grad.data + self.weight_decay * p.data) + \
+                   self.momentum * self.u.get(p_id, 0.)
+            p.data -= self.lr * grad
+            self.u[p_id] = grad
         ### END YOUR SOLUTION
 
 
@@ -61,5 +62,15 @@ class Adam(Optimizer):
 
     def step(self):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        self.t += 1
+        for p in self.params:
+            if p.grad is None:
+                continue
+            p_id = id(p)
+            grad = p.grad.data + self.weight_decay * p.data
+            self.m[p_id] = self.beta1 * self.m.get(p_id, 0.) + (1. - self.beta1) * grad
+            self.v[p_id] = self.beta2 * self.v.get(p_id, 0.) + (1. - self.beta2) * grad ** 2.
+            m_hat = self.m[p_id] / (1. - self.beta1 ** self.t)
+            v_hat = self.v[p_id] / (1. - self.beta2 ** self.t)
+            p.data -= self.lr * m_hat / (v_hat ** .5 + self.eps)
         ### END YOUR SOLUTION

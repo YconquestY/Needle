@@ -52,8 +52,6 @@ def _child_modules(value: object) -> List["Module"]:
         return []
 
 
-
-
 class Module:
     def __init__(self):
         self.training = True
@@ -91,44 +89,43 @@ class Linear(Module):
         self.out_features = out_features
 
         ### BEGIN YOUR SOLUTION
-        # weight initialization
         self.weight = Parameter(init.kaiming_uniform(fan_in=self.in_features,
                                                      fan_out=self.out_features,
-                                                     device=device, dtype=dtype))
-        # bias initialization
-        self.use_bias = bias
-        if self.use_bias:
+                                                     device=device, dtype=dtype,
+                                                     requires_grad=True)) # Is this line necessary?
+        if bias: # Do not learn a bias if `bias` is FALSE.
             self.bias = Parameter(ops.reshape(init.kaiming_uniform(fan_in=self.out_features,
                                                                    fan_out=1,
-                                                                   device=device, dtype=dtype),
+                                                                   device=device, dtype=dtype,
+                                                                   requires_grad=True), # Is this line necessary?
                                               shape=(1, self.out_features)))
-        #print(self.bias.shape)
         ### END YOUR SOLUTION
 
     def forward(self, X: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
-        # needle tensors do not support the `ndim` attribute.
-        # broadcast weights
-        if len(X.shape) > 2:
-            self.weight = ops.broadcast_to(ops.reshape(self.weight,
-                                                       (1,) + self.weight.shape),
-                                           (X.shape[0],) + self.weight.shape)
-        # broadcasr bias: random initialization replicated?
-        if self.use_bias:
-            if len(X.shape) > 2:
-                self.bias = ops.broadcast_to(ops.reshape(self.bias,
-                                                         (1,) + self.bias.shape),
-                                             tuple(X.shape[ :2]) + (self.out_features,))
-            else:
-                self.bias = ops.broadcast_to(self.bias,
-                                             (X.shape[0], self.out_features))
-        
-        if self.use_bias:
-            return X @ self.weight + self.bias
-        else:
+        # Caveats
+        # 1. There is no need to broadcast weights. This is because `MatMul`
+        #    already considers the case of dimension mismatch. In practice,
+        #    broadcasting weights leads to numerical errors during optimization.
+        # 
+        #    However, it is necessary to broadcast bias in that `EWiseAdd`
+        #    applies to tensors of the same shape.
+        # 2. Do not assign `self.bias` with the broadcast version, use a local
+        #    variable instead.
+        #
+        #    Incorrect code:
+        #        self.bias = ops.broadcast_to(self.bias,
+        #                                     X.shape[ :-1] + (self.out_features,))
+        #
+        #    This irreversiblly modifies of the shape of `self.bias`.
+        try:
+            bias = self.bias
+        except AttributeError:
             return X @ self.weight
+        else:
+            return X @ self.weight + ops.broadcast_to(bias,
+                                                      X.shape[ :-1] + (self.out_features,))           
         ### END YOUR SOLUTION
-
 
 
 class Flatten(Module):
@@ -152,8 +149,8 @@ class Sequential(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
-        for module in self.modules:
-            x = module(x)
+        for fn in self.modules:
+            x = fn(x)
         return x
         ### END YOUR SOLUTION
 
@@ -163,12 +160,12 @@ class SoftmaxLoss(Module):
         ### BEGIN YOUR SOLUTION
         z_y = ops.summation(logits * init.one_hot(logits.shape[-1], y,
                                                   device=logits.device,
-                                                  dtype=logits.dtype),
+                                                  dtype=logits.dtype,
+                                                  requires_grad=False),
                             axes=(-1,))
         return ops.summation(ops.logsumexp(logits,
                                            axes=(-1,)) - z_y) / logits.shape[0]
         ### END YOUR SOLUTION
-
 
 
 class BatchNorm1d(Module):
@@ -179,42 +176,51 @@ class BatchNorm1d(Module):
         self.momentum = momentum
         ### BEGIN YOUR SOLUTION
         self.weight = Parameter(init.ones(1, self.dim,
-                                          device=device, dtype=dtype))
+                                          device=device, dtype=dtype,
+                                          requires_grad=True)) # Is this line necessary?
         self.bias = Parameter(init.zeros(1, self.dim,
-                                         device=device, dtype=dtype))
-        # The following instance variables shall exist even though the layer
-        # is initialized for training.
-        self.running_mean = Parameter(init.zeros(self.dim,
-                                                 device=device, dtype=dtype))
-        self.running_var = Parameter(init.ones(self.dim,
-                                               device=device, dtype=dtype))
+                                         device=device, dtype=dtype,
+                                         requires_grad=True)) # Is this line necessary?
+        # The running estimates is updated during training. They do not
+        # constitute the computational graph, hence are fixed in evaluation.
+        self.running_mean = init.zeros(self.dim,
+                                       device=device, dtype=dtype,
+                                       requires_grad=False)
+        self.running_var = init.ones(self.dim,
+                                     device=device, dtype=dtype,
+                                     requires_grad=False)
         ### END YOUR SOLUTION
 
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
         # Needle does not support implicit broadcasting.
+        # Do not forget to broadcast weight and bias.
         mean = ops.summation(x, axes=(-2,)) / x.shape[-2]
-        self.running_mean = (1. - self.momentum) * self.running_mean + self.momentum * mean
-        
         shift = x - ops.broadcast_to(ops.reshape(mean,
                                                  (1, self.dim)),
                                      x.shape)
         var = ops.summation(shift ** 2. ,
                             axes=(-2,)) / x.shape[-2]
-        self.running_var = (1. - self.momentum) * self.running_var  + self.momentum * var
-
         if self.training:
-            std = ops.broadcast_to(ops.reshape((ops.summation(shift ** 2. ,
-                                                              axes=(-2,)) / x.shape[-2] + self.eps) ** .5,
+            # `running_mean` and `running_var` do not constitute the
+            # computational graph. Only update their `cached_data`.
+            self.running_mean.data = (1. - self.momentum) * self.running_mean.data + self.momentum * mean.data
+            self.running_var.data  = (1. - self.momentum) * self.running_var.data  + self.momentum * var.data
+            std = ops.broadcast_to(ops.reshape((var + self.eps) ** .5,
                                                (1, self.dim)),
                                    x.shape)
-            return self.weight * shift / std + self.bias
+            return ops.broadcast_to(self.weight,
+                                    x.shape) * shift / std + ops.broadcast_to(self.bias,
+                                                                              x.shape)
         else:
-            return (x - ops.broadcast_to(ops.reshape(self.running_mean,
-                                                     (1, self.dim)),
-                                         x.shape)) / (ops.broadcast_to(ops.reshape(self.running_var,
+            x_hat = (x - ops.broadcast_to(ops.reshape(self.running_mean.data,
+                                                      (1, self.dim)),
+                                          x.shape)) / ops.broadcast_to(ops.reshape((self.running_var.data + self.eps) ** .5,
                                                                                    (1, self.dim)),
-                                                                       x.shape) + self.eps) ** .5
+                                                                       x.shape)
+            return ops.broadcast_to(self.weight.data,
+                                    x.shape) * x_hat + ops.broadcast_to(self.bias.data,
+                                                                        x.shape)
         ### END YOUR SOLUTION
 
 
@@ -225,23 +231,28 @@ class LayerNorm1d(Module):
         self.eps = eps
         ### BEGIN YOUR SOLUTION
         self.weight = Parameter(init.ones(1, self.dim,
-                                          device=device, dtype=dtype))
+                                          device=device, dtype=dtype,
+                                          requires_grad=True)) # Is this line necessary?
         self.bias = Parameter(init.zeros(1, self.dim,
-                                         device=device, dtype=dtype))
+                                         device=device, dtype=dtype,
+                                         requires_grad=True)) # Is this line necessary?
         ### END YOUR SOLUTION
 
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
         # Needle does not support implicit broadcasting.
+        # Do not forget to broadcast weight and bias.
         mean = ops.broadcast_to(ops.reshape(ops.summation(x, axes=(-1,)) / x.shape[-1],
-                                            (x.shape[-2], 1)),
+                                            x.shape[ :-1] + (1,)),
                                 x.shape)
         shift = x - mean
         std = ops.broadcast_to(ops.reshape((ops.summation(shift ** 2. ,
                                                           axes=(-1,)) / x.shape[-1] + self.eps) ** .5,
-                                           (x.shape[-2], 1)),
+                                           x.shape[ :-1] + (1,)),
                                x.shape)
-        return self.weight * shift / std + self.bias
+        return ops.broadcast_to(self.weight,
+                                x.shape) * shift / std + ops.broadcast_to(self.bias,
+                                                                          x.shape)
         ### END YOUR SOLUTION
 
 
@@ -253,7 +264,9 @@ class Dropout(Module):
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
         if self.training:
-            mask = init.randb(*x.shape, p=self.p, device=x.device)
+            mask = init.randb(*x.shape,
+                              p=(1. - self.p),
+                              device=x.device)
             return mask * x / (1. - self.p)
         else:
             return x

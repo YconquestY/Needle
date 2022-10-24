@@ -5,6 +5,9 @@ from collections import namedtuple
 import numpy
 from needle import init
 
+from operator  import add    # for helper `sum_node_list` to sum a list of tensors
+from functools import reduce # without indroducing `dtype mismatch`
+
 # needle version
 LAZY_MODE = False
 TENSOR_COUNTER = 0
@@ -153,7 +156,7 @@ class Value:
         self.cached_data = self.op.compute(
             *[x.realize_cached_data() for x in self.inputs]
         )
-        self.cached_data
+        #self.cached_data
         return self.cached_data
 
     def is_leaf(self):
@@ -300,11 +303,11 @@ class Tensor(Value):
             requires_grad=requires_grad,
         )
         return tensor
-
+    # The `@property` decorator renders the method a getter.
     @property
     def data(self):
         return self.detach()
-
+    # The `@….setter` decorator must follow the `@property` decorator.
     @data.setter
     def data(self, value):
         assert isinstance(value, Tensor)
@@ -429,15 +432,21 @@ def compute_gradient_of_variables(output_tensor, out_grad):
         # get list of grad contributions
         output_grads_list = node_to_output_grads_list[node]
         # compute grad of current node w.r.t. output node
-        node.grad = sum(output_grads_list)
+        # WARNING
+        # The routine to sum a list of tensors is provided at the bottom. Do
+        # not use Python built-in `sum`, which may lead to `dtype` mismatch.
+        # `dtype` coherence is significant during optimazation.
+        #
+        # `hw1.ipynb` elaborates on this caveat.
+        node.grad = sum_node_list(output_grads_list)
         # propagate grad to inputs
         if not node.is_leaf():
-            for in_node, grad in zip(node.inputs,
-                                     node.op.gradient(node.grad, node)): # The gradient of an operation
-                if in_node not in node_to_output_grads_list:             # is deliberately set as a
-                    node_to_output_grads_list[in_node] = [grad]          # tuple even if there is a
-                else:                                                    # single gradient.
-                    node_to_output_grads_list[in_node].append(grad)
+            for node_input, grad in zip(node.inputs,
+                                        node.op.gradient(node.grad, node)): # The gradient of an operation
+                if node_input not in node_to_output_grads_list:             # is deliberately set as a
+                    node_to_output_grads_list[node_input] = [grad]          # tuple even if there is a
+                else:                                                       # single gradient.
+                    node_to_output_grads_list[node_input].append(grad)
     ### END YOUR SOLUTION
 
 
@@ -473,9 +482,9 @@ def topo_sort_dfs(node, visited, topo_order):
     if node.is_leaf():
         topo_order.append(node)
     else:
-        for in_node in node.inputs:
-            if id(in_node) not in visited:
-                topo_sort_dfs(in_node, visited, topo_order)
+        for node_input in node.inputs:
+            if id(node_input) not in visited:
+                topo_sort_dfs(node_input, visited, topo_order)
         topo_order.append(node)
     ### END YOUR SOLUTION
 
@@ -485,8 +494,7 @@ def topo_sort_dfs(node, visited, topo_order):
 ##############################
 
 
-def sum_node_list(node_list):
-    """Custom sum function in order to avoid create redundant nodes in Python sum implementation."""
-    from operator import add
-    from functools import reduce
-    return reduce(add, node_list)
+#def sum_node_list(node_list):
+#    """Custom sum function in order to avoid create redundant nodes in Python sum implementation."""
+#    return reduce(add, node_list)
+sum_node_list = lambda node_list : reduce(add, node_list)

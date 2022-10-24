@@ -167,7 +167,8 @@ def learn_model_1d(feature_size, nclasses, _model, optimizer, epochs=1, **kwargs
     opt = optimizer(model.parameters(), **kwargs)
 
     for _ in range(epochs):
-        for i, (X0, y0) in enumerate(zip(np.array_split(X, m//batch), np.array_split(y, m//batch))):
+        for i, (X0, y0) in enumerate(zip(np.array_split(X, m//batch),
+                                         np.array_split(y, m//batch))):
             opt.reset_grad()
             X0, y0 = ndl.Tensor(X0, dtype="float32"), ndl.Tensor(y0)
             out = model(X0)
@@ -179,8 +180,6 @@ def learn_model_1d(feature_size, nclasses, _model, optimizer, epochs=1, **kwargs
             grad_after = model.parameters()[0].grad.detach().cached_data
             np.testing.assert_allclose(grad_before, grad_after, rtol=1e-5, atol=1e-5, \
                                        err_msg="Optim should not modify gradients in place")
-
-
     return np.array(loss.cached_data)
 
 def learn_model_1d_eval(feature_size, nclasses, _model, optimizer, epochs=1, **kwargs):
@@ -965,7 +964,7 @@ def submit_optim_sgd():
     mugrade.submit(learn_model_1d(48, 16, lambda z: nn.Sequential(nn.Linear(48, 32), nn.ReLU(), nn.Linear(32, 16)), ndl.optim.SGD, lr=0.01, momentum=0.9, epochs=2))
     mugrade.submit(learn_model_1d(48, 16, lambda z: nn.Sequential(nn.Linear(48, 32), nn.ReLU(), nn.BatchNorm1d(32), nn.Linear(32, 16)), ndl.optim.SGD, lr=0.01, momentum=0.0, weight_decay=0.01, epochs=2))
     mugrade.submit(learn_model_1d(54, 16, lambda z: nn.Sequential(nn.Linear(54, 32), nn.ReLU(), nn.Linear(32, 16)), ndl.optim.SGD, lr=0.01, momentum=0.9, weight_decay=0.01, epochs=2))
-    mugrade.submit(learn_model_1d(64, 4, lambda z: nn.Sequential(nn.Linear(64, 8), nn.ReLU(), nn.Residual(nn.Linear(8, 8)), nn.Linear(8, 4)), ndl.optim.SGD, epochs=3, lr=0.01, weight_decay=0.001))
+    mugrade.submit(learn_model_1d(64, 4 , lambda z: nn.Sequential(nn.Linear(64, 8) , nn.ReLU(), nn.Residual(nn.Linear(8, 8)), nn.Linear(8, 4)), ndl.optim.SGD, epochs=3, lr=0.01, weight_decay=0.001))
 
 
 def test_optim_adam_1():

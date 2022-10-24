@@ -178,7 +178,15 @@ class DivScalar(TensorOp):
 
     def compute(self, a):
         ### BEGIN YOUR SOLUTION
-        return array_api.divide(a, self.scalar)
+        # WARNING
+        # Dividing a float by an interger may introduce dtype mismatch. Fellows
+        # on the forums reports `float32 / int` yields `float64`, although I
+        # did not encounter this issue.
+        #
+        # Type alignment is pivotal in that optimizers shall not assign weights
+        # of different type than the original one.
+        return array_api.divide(a, self.scalar,
+                                dtype=a.dtype)
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
@@ -230,7 +238,8 @@ class Reshape(TensorOp):
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        return (reshape(out_grad, node.inputs[0].shape),) # a deliberate tuple
+        return (reshape(out_grad,
+                        node.inputs[0].shape),) # a deliberate tuple
         ### END YOUR SOLUTION
 
 
@@ -370,10 +379,21 @@ class ReLU(TensorOp):
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        # NOT numeriacally stable
-        # better solution required
-        grad = divide(relu(node.inputs[0]), node.inputs[0])
-        return (multiply(out_grad, grad),) # a deliberate tuple
+        #######################################################################
+        # The original solution is not numerically stable.
+        #
+        # grad = divide(relu(node.inputs[0]), node.inputs[0])
+        # return (multiply(out_grad, grad),)
+        #######################################################################
+        # There seems to be no numerically stable solution
+        # that solely calls needle operations. assistance of
+        # `array_api` is a must.
+        node_input = node.inputs[0]
+        return (multiply(out_grad,
+                         Tensor(node_input.realize_cached_data() > 0,
+                                device=node.device,
+                                dtype=node.dtype,
+                                required_grad=node.requires_grad)),) # a deliberate tuple
         ### END YOUR SOLUTION
 
 
