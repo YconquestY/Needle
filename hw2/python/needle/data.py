@@ -15,16 +15,16 @@ class RandomFlipHorizontal(Transform):
         self.p = p
 
     def __call__(self, img):
-        """ Horizonally flip an image, specified as n H x W x C NDArray.
+        """ Horizonally flip images, specified as n B x H x W x C NDArray.
         Args:
-            img: H x W x C NDArray of an image
+            img: B x H x W x C NDArray of images
         Returns:
-            H x W x C NDArray corresponding to image flipped with probability self.p
+            B x H x W x C NDArray corresponding to images flipped with probability self.p
         Note: use the provided code to provide randomness, for easier testing
         """
         flip_img = np.random.rand() < self.p
         ### BEGIN YOUR SOLUTION
-        return np.flip(img, axis=1) if flip_img else img
+        return np.flip(img, axis=-2) if flip_img else img
         ### END YOUR SOLUTION
 
 
@@ -33,34 +33,28 @@ class RandomCrop(Transform):
         self.padding = padding
 
     def __call__(self, img):
-        """ Zero pad and then randomly crop an image.
+        """ Zero pad and then randomly crop images.
         Args:
-             img: H x W x C NDArray of an image
+             img: B x H x W x C NDArray of images
         Return 
-            H x W x C NDArray of cliped image
+            B x H x W x C NDArray of cliped images
         Note: generate the image shifted by shift_x, shift_y specified below
         """
         shift_x, shift_y = np.random.randint(low=-self.padding,
                                              high=self.padding+1,
                                              size=2)
         ### BEGIN YOUR SOLUTION
-        if img.ndim == 3: # RGB image: do not pad channel dimension
-            return np.pad(img,
-                          ((self.padding, self.padding),
-                           (self.padding, self.padding),
-                           (0, 0)),
-                          mode='constant', constant_values=0)[self.padding + shift_x :
-                                                              self.padding + shift_x + img.shape[0],
-                                                              self.padding + shift_y :
-                                                              self.padding + shift_y + img.shape[1], :]
-        elif img.ndim == 2: # grayscale image
-            return np.pad(img,
-                          ((self.padding, self.padding),
-                           (self.padding, self.padding)),
-                          mode='constant', constant_values=0)[self.padding + shift_x :
-                                                              self.padding + shift_x + img.shape[0],
-                                                              self.padding + shift_y :
-                                                              self.padding + shift_y + img.shape[1]]
+        pad_width = ((self.padding, self.padding),
+                     (self.padding, self.padding),
+                     (0, 0))
+        if img.ndim == 4:
+            pad_width = ((0, 0),) + pad_width
+        return np.pad(img,
+                      pad_width,
+                      mode='constant', constant_values=0)[..., self.padding + shift_x :
+                                                               self.padding + shift_x + img.shape[-3],
+                                                               self.padding + shift_y :
+                                                               self.padding + shift_y + img.shape[-2], :]
         ### END YOUR SOLUTION
 
 
@@ -152,19 +146,22 @@ class MNISTDataset(Dataset):
         ### BEGIN YOUR SOLUTION
         self.image_filename = image_filename
         self.label_filename = label_filename
+        self.h = self.w = 28
         self.transforms = transforms
+        self.transforms_fn = lambda I : np.reshape(self.apply_transforms(np.reshape(I,
+                                                                                    (-1, self.h, self.w))[..., None]),
+                                                   (-1, self.h * self.w))
         ### END YOUR SOLUTION
 
     def __getitem__(self, index) -> object:
         ### BEGIN YOUR SOLUTION
-        h = w = 28
-        tform = lambda I : np.reshape(self.apply_transforms(np.reshape(I, (-1,h,w))),
-                                      (-1, h*w))
         try:
-            return tform(self.img[index]), self.lbl[index]
+            img, lbl = self.img[index], self.lbl[index] # image shape: (B, H x W)
         except AttributeError:
             self.img, self.lbl = parse_mnist(self.image_filename, self.label_filename)
-            return tform(self.img[index]), self.lbl[index]
+            return self.transforms_fn(self.img[index]), self.lbl[index]
+        else:
+            return self.transforms_fn(img), lbl
         ### END YOUR SOLUTION
 
     def __len__(self) -> int:

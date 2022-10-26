@@ -29,8 +29,8 @@ class SGD(Optimizer):
     def step(self):
         ### BEGIN YOUR SOLUTION
         for p in self.params:
-            if p.grad is None:
-                continue
+            #if p.grad is None:
+            #    continue
             p_id = id(p)
             grad = (1. - self.momentum) * (p.grad.data + self.weight_decay * p.data) + \
                    self.momentum * self.u.get(p_id, 0.)
@@ -64,8 +64,8 @@ class Adam(Optimizer):
         ### BEGIN YOUR SOLUTION
         self.t += 1
         for p in self.params:
-            if p.grad is None:
-                continue
+            #if p.grad is None:
+            #    continue
             p_id = id(p)
             grad = p.grad.data + self.weight_decay * p.data
             self.m[p_id] = self.beta1 * self.m.get(p_id, 0.) + (1. - self.beta1) * grad
