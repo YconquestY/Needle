@@ -1,14 +1,16 @@
 # Needle
 
-A deep learning framework with customized GPU and NumPy CPU backend.  
+An imperative deep learning framework with **customized GPU and CPU backend**.  
 
 Ongoing project; **switch to the branch `hw` for details.**
 
 ## References
 
-[10-414/714](https://dlsyscourse.org) *Deep Learning Systems* (fall 2022) by [Carnegie Mellon University](https://www.cmu.edu)<br>
-[Tiny CUDA NN](https://github.com/NVlabs/tiny-cuda-nn)
+[10-414/714](https://dlsyscourse.org) *Deep Learning Systems* by [Carnegie Mellon University](https://www.cmu.edu)
 
+[How To Optimize GEMM](https://github.com/flame/how-to-optimize-gemm)
+
+[Tiny CUDA NN](https://github.com/NVlabs/tiny-cuda-nn)
 ```
 @software{tiny-cuda-nn,
 	author = {M\"uller, Thomas},
