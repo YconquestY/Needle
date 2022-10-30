@@ -25,13 +25,13 @@ class Device:
 
 class CPUDevice(Device):
     """Represents data that sits in CPU"""
-
+    # return a string representing the object (as the developer wants to see it)
     def __repr__(self):
         return "needle.cpu()"
-
+    # An unhashbale object cannot be put in a set.
     def __hash__(self):
         return self.__repr__().__hash__()
-
+    # A hashable object must also implement `__eq__`.
     def __eq__(self, other):
         return isinstance(other, CPUDevice)
 
@@ -84,21 +84,21 @@ class Op:
 
         Returns
         -------
-        output: nd.array
+        output: ndarray
             Array output of the operation
 
         """
         raise NotImplementedError()
 
-    def gradient(
-        self, out_grad: "Value", node: "Value"
-    ) -> Union["Value", Tuple["Value"]]:
+    def gradient(self,
+                 out_grad: "Value",
+                 node    : "Value") -> Union["Value", Tuple["Value"]]:
         """Compute partial adjoint for each input value for a given output adjoint.
 
         Parameters
         ----------
         out_grad: Value
-            The adjoint wrt to the output value.
+            The adjoint w.r.t. to the output value.
 
         node: Value
             The value node of forward evaluation.
@@ -111,7 +111,9 @@ class Op:
         """
         raise NotImplementedError()
 
-    def gradient_as_tuple(self, out_grad: "Value", node: "Value") -> Tuple["Value"]:
+    def gradient_as_tuple(self,
+                          out_grad: "Value",
+                          node    : "Value") -> Tuple["Value"]:
         """ Convenience method to always return a tuple from gradient call"""
         output = self.gradient(out_grad, node)
         if isinstance(output, tuple):
@@ -166,15 +168,13 @@ class Value:
         global TENSOR_COUNTER
         TENSOR_COUNTER -= 1
 
-    def _init(
-        self,
-        op: Optional[Op],
-        inputs: List["Tensor"],
-        *,
-        num_outputs: int = 1,
-        cached_data: List[object] = None,
-        requires_grad: Optional[bool] = None
-    ):
+    def _init(self,
+              op: Optional[Op],
+              inputs: List["Tensor"],
+              *,
+              num_outputs: int = 1,
+              cached_data: List[object] = None,
+              requires_grad: Optional[bool] = None):
         global TENSOR_COUNTER
         TENSOR_COUNTER += 1
         if requires_grad is None:
@@ -208,38 +208,6 @@ class Value:
         return value
 
 
-class TensorTuple(Value):
-    """Represent a tuple of tensors.
-
-    To keep things simple, we do not support nested tuples.
-    """
-
-    def __len__(self):
-        cdata = self.realize_cached_data()
-        return len(cdata)
-
-    def __getitem__(self, index: int):
-        return needle.ops.tuple_get_item(self, index)
-
-    def tuple(self):
-        return tuple([x for x in self])
-
-    def __repr__(self):
-        return "needle.TensorTuple" + str(self.tuple())
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __add__(self, other):
-        assert isinstance(other, TensorTuple)
-        assert len(self) == len(other)
-        return needle.ops.make_tuple(*[self[i] + other[i] for i in range(len(self))])
-
-    def detach(self):
-        """Create a new tensor that shares the data but detaches from the graph."""
-        return Tuple.make_const(self.realize_cached_data())
-
-
 class Tensor(Value):
     grad: "Tensor"
 
@@ -257,10 +225,12 @@ class Tensor(Value):
                 device = array.device
             if dtype is None:
                 dtype = array.dtype
+            
             if device == array.device and dtype == array.dtype:
                 cached_data = array.realize_cached_data()
             else:
-                # fall back, copy through numpy conversion
+                # Needle cannot convert array data type in place. Cached data
+                # are copied as and converted from `NDArray`.
                 cached_data = Tensor._array_from_numpy(
                     array.numpy(), device=device, dtype=dtype
                 )
@@ -274,7 +244,7 @@ class Tensor(Value):
             cached_data=cached_data,
             requires_grad=requires_grad,
         )
-
+    # convert NumPy array to (customized) NDArray
     @staticmethod
     def _array_from_numpy(numpy_array, device, dtype):
         if array_api is numpy:
@@ -297,9 +267,8 @@ class Tensor(Value):
         tensor._init(
             None,
             [],
-            cached_data=data
-            if not isinstance(data, Tensor)
-            else data.realize_cached_data(),
+            cached_data=data if   not isinstance(data, Tensor)
+                             else data.realize_cached_data(),
             requires_grad=requires_grad,
         )
         return tensor
@@ -311,10 +280,8 @@ class Tensor(Value):
     @data.setter
     def data(self, value):
         assert isinstance(value, Tensor)
-        assert value.dtype == self.dtype, "%s %s" % (
-            value.dtype,
-            self.dtype,
-        )
+        assert value.dtype == self.dtype, "%s %s" % (value.dtype,
+                                                     self.dtype)
         self.cached_data = value.realize_cached_data()
 
     def detach(self):
@@ -323,22 +290,25 @@ class Tensor(Value):
 
     @property
     def shape(self):
-        return self.realize_cached_data().shape
+        return self.realize_cached_data().shape # NDArray attribute
 
     @property
     def dtype(self):
-        return self.realize_cached_data().dtype
+        return self.realize_cached_data().dtype # NDArray attribute
 
     @property
     def device(self):
         data = self.realize_cached_data()
-        # numpy array always sits on cpu
+        # NumPy arrays always sit on CPUs.
         if array_api is numpy:
             return cpu()
-        return data.device
+        return data.device # NDArray attribute
 
     def backward(self, out_grad=None):
-        out_grad = out_grad if out_grad else init.ones(*self.shape, dtype=self.dtype, device=self.device)
+        out_grad = out_grad if out_grad \
+                            else init.ones(*self.shape,
+                                           dtype=self.dtype,
+                                           device=self.device)
         compute_gradient_of_variables(self, out_grad)
 
     def __repr__(self):
@@ -373,6 +343,9 @@ class Tensor(Value):
             return needle.ops.PowerScalar(other)(self)
         ### END YOUR SOLUTION
 
+    def __neg__(self):
+        return needle.ops.Negate()(self)
+
     def __sub__(self, other):
         if isinstance(other, Tensor):
             return needle.ops.EWiseAdd()(self, needle.ops.Negate()(other))
@@ -384,10 +357,10 @@ class Tensor(Value):
             return needle.ops.EWiseDiv()(self, other)
         else:
             return needle.ops.DivScalar(other)(self)
-
+    # support the `@` operator
     def __matmul__(self, other):
         return needle.ops.MatMul()(self, other)
-
+    # support the `matmul` method
     def matmul(self, other):
         return needle.ops.MatMul()(self, other)
 
@@ -400,16 +373,45 @@ class Tensor(Value):
     def reshape(self, shape):
         return needle.ops.Reshape(shape)(self)
 
-    def __neg__(self):
-        return needle.ops.Negate()(self)
-
     def transpose(self, axes=None):
         return needle.ops.Transpose(axes)(self)
-
+    # support commutativity
     __radd__ = __add__
-    __rmul__ = __mul__
     __rsub__ = __sub__
+    __rmul__ = __mul__
     __rmatmul__ = __matmul__
+
+
+class TensorTuple(Value):
+    """Represent a tuple of tensors.
+
+    To keep things simple, we do not support nested tuples.
+    """
+
+    def __len__(self):
+        cdata = self.realize_cached_data()
+        return len(cdata)
+
+    def __getitem__(self, index: int):
+        return needle.ops.tuple_get_item(self, index)
+
+    def tuple(self):
+        return tuple([x for x in self])
+
+    def __repr__(self):
+        return "needle.TensorTuple" + str(self.tuple())
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __add__(self, other):
+        assert isinstance(other, TensorTuple)
+        assert len(self) == len(other)
+        return needle.ops.make_tuple(*[self[i] + other[i] for i in range(len(self))])
+
+    def detach(self):
+        """Create a new tensor that shares the data but detaches from the graph."""
+        return Tuple.make_const(self.realize_cached_data())
 
 
 def compute_gradient_of_variables(output_tensor, out_grad):
@@ -441,6 +443,10 @@ def compute_gradient_of_variables(output_tensor, out_grad):
         node.grad = sum_node_list(output_grads_list)
         # propagate grad to inputs
         if not node.is_leaf():
+            # Typically, one should call `Op.gradient_as_tuple` to convert the
+            # output of `….gradient` to a tuple so that it may be zipped with
+            # `.inputs` as an iterable. I deliberately always return a tuple
+            # in `ops`, thus, there is no need to call `gradient_as_tuple`.
             for node_input, grad in zip(node.inputs,
                                         node.op.gradient(node.grad, node)): # The gradient of an operation
                 if node_input not in node_to_output_grads_list:             # is deliberately set as a

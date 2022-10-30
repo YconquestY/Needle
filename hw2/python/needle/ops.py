@@ -7,8 +7,8 @@ from .autograd import Op, Tensor, Value, TensorOp
 from .autograd import TensorTuple, TensorTupleOp
 import numpy
 
-# NOTE: we will numpy as the array_api
-# to backup our computations, this line will change in later homeworks
+# NOTE: we will use NumPy as array_api to backup computations,
+# which will change in later homework.
 import numpy as array_api
 
 
