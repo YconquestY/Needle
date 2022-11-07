@@ -1,5 +1,7 @@
 # lectures
-l*/
+l*
+# build
+build/
 # experiments
 tmp*
 # editor
