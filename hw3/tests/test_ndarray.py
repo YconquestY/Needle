@@ -121,7 +121,7 @@ ShapeAndSlices = lambda *shape: _ShapeAndSlices(np.ones(shape))
     {
         "lhs": ShapeAndSlices(4, 5, 6)[1:3, 2:5, 2:6],
         "rhs": ShapeAndSlices(7, 7, 7)[:2, :3, :4]
-    },   
+    },
 ])
 @pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])
 def test_setitem_ewise(params, device):
@@ -153,7 +153,7 @@ def test_setitem_scalar(params, device):
     _A = np.random.randn(*shape)
     A = nd.array(_A, device=device)
     # probably tear these out using lambdas
-    print(slices)
+    #print(slices)
     start_ptr = A._handle.ptr()
     _A[slices] = 4.0
     A[slices] = 4.0

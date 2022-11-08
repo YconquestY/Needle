@@ -367,7 +367,7 @@ class NDArray:
         assert len(idxs) == self.ndim, "Need indexes equal to number of dimensions"
 
         ### BEGIN YOUR SOLUTION
-        return self.as_strided(shape=tuple(idx.stop - idx.start for idx in idxs),
+        return self.as_strided(shape=tuple(len(range(idx.start, idx.stop, idx.step)) for idx in idxs),
                                strides=tuple(self.strides[i] * idx.step for i, idx in enumerate(idxs)),
                                offset=(self._offset +
                                        sum(self.strides[i] * idx.start for i, idx in enumerate(idxs))))

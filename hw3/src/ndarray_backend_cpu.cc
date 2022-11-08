@@ -5,9 +5,14 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include <vector>  // This header is not initially declared,
+                   // but `vector` is an input type to functions.
+#include <numeric> // for `accumulate`,
+#include <functional> // for `multiplies`
 
 namespace needle {
-namespace cpu {
+namespace cpu    {
+
 
 #define ALIGNMENT 256
 #define TILE 8
@@ -16,93 +21,174 @@ const size_t ELEM_SIZE = sizeof(scalar_t);
 
 
 /**
- * This is a utility structure for maintaining an array aligned to ALIGNMENT boundaries in
- * memory.  This alignment should be at least TILE * ELEM_SIZE, though we make it even larger
- * here by default.
+ * This is a utility structure for maintaining an array aligned to ALIGNMENT
+ * boundaries in memory. This alignment should be at least TILE * ELEM_SIZE,
+ * though we make it even larger here by default.
  */
-struct AlignedArray {
-  AlignedArray(const size_t size) {
-    int ret = posix_memalign((void**)&ptr, ALIGNMENT, size * ELEM_SIZE);
-    if (ret != 0) throw std::bad_alloc();
-    this->size = size;
-  }
-  ~AlignedArray() { free(ptr); }
-  size_t ptr_as_int() {return (size_t)ptr; }
-  scalar_t* ptr;
-  size_t size;
+struct AlignedArray
+{
+    AlignedArray(const size_t size)
+    {
+        // see https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_memalign.html
+        // Weirdly, there is no manual for the API from CL.
+        int ret = posix_memalign((void**)&ptr, ALIGNMENT, size * ELEM_SIZE);
+        if (ret != 0) throw std::bad_alloc();
+        this->size = size;
+    }
+    ~AlignedArray() {
+        free(ptr);
+    }
+    size_t ptr_as_int() {
+        return (size_t) ptr;
+    }
+    scalar_t *ptr;
+    size_t   size;
 };
 
 
-
-void Fill(AlignedArray* out, scalar_t val) {
-  /**
-   * Fill the values of an aligned array with val
-   */
-  for (int i = 0; i < out->size; i++) {
-    out->ptr[i] = val;
-  }
+void Fill(AlignedArray* out, scalar_t val)
+{
+    /**
+     * Fill the an aligned array with `val`
+     */
+    for (int i = 0; i < out->size; i++) {
+        out->ptr[i] = val;
+    }
 }
 
 
+/// BEGIN YOUR SOLUTION
+uint32_t GetMemIdx(uint32_t idx, uint32_t* carry,
+                   std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+{
+    /**
+     * Get the actual index of an array element in memory. The index strategy
+     * is implemented in a modular fashion so that it is used by `Compact` and
+     * `…Setitem`.
+     * 
+     * Args:
+     *   idx[uint32_t]   : index of the element in the (non-compact) array
+     *   carry[uint32_t&]: a pointer to the carry array
+     *   shape[vector<uint32_t>]  : shape   of the array
+     *   strides[vector<uint32_t>]: strides of the array
+     *   offset[size_t]           : offset  of the array
+     * 
+     * Returns:
+     *   uint32_t: index of the element in memory
+     */
+    uint32_t mem_idx = offset;
+    for (unsigned int i = 0; i < shape.size(); i++) {
+        mem_idx += (idx / carry[i]) % shape[i] * strides[i];
+    }
+    return mem_idx;
+}
+/// END YOUR SOLUTION
 
 
-void Compact(const AlignedArray& a, AlignedArray* out, std::vector<uint32_t> shape,
-             std::vector<uint32_t> strides, size_t offset) {
-  /**
-   * Compact an array in memory
-   *
-   * Args:
-   *   a: non-compact representation of the array, given as input
-   *   out: compact version of the array to be written
-   *   shape: shapes of each dimension for a and out
-   *   strides: strides of the *a* array (not out, which has compact strides)
-   *   offset: offset of the *a* array (not out, which has zero offset, being compact)
-   *
-   * Returns:
-   *  void (you need to modify out directly, rather than returning anything; this is true for all the
-   *  function will implement here, so we won't repeat this note.)
-   */
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+// `a` is a reference rather than a pointer.
+// This is because we do not write to a populated array.
+// see https://stackoverflow.com/questions/57483/what-are-the-differences-between-a-pointer-variable-and-a-reference-variable
+void Compact(const AlignedArray& a, AlignedArray* out,
+             std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+{
+    /**
+     * Compact an array in memory
+     *
+     * Args:
+     *   a:       non-compact representation of the array, given as input
+     *   out:     compact version of the array to be written
+     *   shape:   shapes of each dimension for `a` and `out`
+     *   strides: strides of the `a` array (not `out`, which has compact strides)
+     *   offset:  offset  of the `a` array (not `out`, which has zero offset, being compact)
+     *
+     * Returns:
+     *   void (you need to modify out directly, rather than returning anything; this is true for all the
+     *   function will implement here, so we won't repeat this note.)
+     */
+    /// BEGIN YOUR SOLUTION
+    // compute total size
+    // see https://en.cppreference.com/w/cpp/algorithm/accumulate
+    //     https://en.cppreference.com/w/cpp/utility/functional/multiplies
+    uint32_t size = accumulate(shape.begin(), shape.end(), 1, std::multiplies<uint32_t>());
+    out->size = size; // necessary?
+    // determine carry "boundaries"
+    uint32_t *carry = new uint32_t[shape.size()];
+    carry[shape.size() - 1] = 1;
+    for (int i = shape.size() - 2; i >= 0; i--) { // Do not use `unsigned int`.
+        carry[i] = carry[i + 1] * shape[i + 1];
+    }
+
+    for (uint32_t idx = 0; idx < out->size; idx++) {
+        out->ptr[idx] = a.ptr[GetMemIdx(idx, carry, shape, strides, offset)];
+    }
+    // free memory
+    delete[] carry;
+    /// END YOUR SOLUTION
 }
 
-void EwiseSetitem(const AlignedArray& a, AlignedArray* out, std::vector<uint32_t> shape,
-                  std::vector<uint32_t> strides, size_t offset) {
-  /**
-   * Set items in a (non-compact) array
-   *
-   * Args:
-   *   a: _compact_ array whose items will be written to out
-   *   out: non-compact array whose items are to be written
-   *   shape: shapes of each dimension for a and out
-   *   strides: strides of the *out* array (not a, which has compact strides)
-   *   offset: offset of the *out* array (not a, which has zero offset, being compact)
-   */
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+void EwiseSetitem(const AlignedArray& a, AlignedArray* out,
+                  std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+{
+    /**
+     * Set items in a (non-compact) array
+     *
+     * Args:
+     *   a:       compact array whose items will be written to `out`
+     *   out:     non-compact array whose items are to be written
+     *   shape:   shapes of each dimension for `a` and `out`
+     *   strides: strides of the `out` array (not `a`, which has compact strides)
+     *   offset:  offset  of the `out` array (not `a`, which has zero offset, being compact)
+     */
+    /// BEGIN YOUR SOLUTION
+    // compute total size
+    uint32_t size = accumulate(shape.begin(), shape.end(), 1, std::multiplies<uint32_t>());
+    // determine carry "boundaries"
+    uint32_t *carry = new uint32_t[shape.size()];
+    carry[shape.size() - 1] = 1;
+    for (int i = shape.size() - 2; i >= 0; i--) { // Do not use `unsigned int`.
+        carry[i] = carry[i + 1] * shape[i + 1];
+    }
+
+    for (uint32_t idx = 0; idx < a.size; idx++) {
+        out->ptr[GetMemIdx(idx, carry, shape, strides, offset)] = a.ptr[idx];
+    }
+    // free memory
+    delete[] carry;
+    /// END YOUR SOLUTION
 }
 
-void ScalarSetitem(const size_t size, scalar_t val, AlignedArray* out, std::vector<uint32_t> shape,
-                   std::vector<uint32_t> strides, size_t offset) {
-  /**
-   * Set items is a (non-compact) array
-   *
-   * Args:
-   *   size: number of elements to write in out array (note that this will note be the same as
-   *         out.size, because out is a non-compact subset array);  it _will_ be the same as the
-   *         product of items in shape, but convenient to just pass it here.
-   *   val: scalar value to write to
-   *   out: non-compact array whose items are to be written
-   *   shape: shapes of each dimension of out
-   *   strides: strides of the out array
-   *   offset: offset of the out array
-   */
+void ScalarSetitem(const size_t size, scalar_t val, AlignedArray* out,
+                   std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+{
+    /**
+     * Set items in a (non-compact) array
+     *
+     * Args:
+     *   size   : number of elements to write in `out` array (note that this is
+     *            equal to `out.size`, because out is a non-compact subset
+     *            array);  it is also the same as the product of items in
+     *            `shape`, but convenient to just pass it here.
+     *   val    : scalar value to write to
+     *   out    : non-compact array whose items are to be written
+     *   shape  : shapes  of each dimension of out
+     *   strides: strides of the out array
+     *   offset : offset  of the out array
+     */
 
-  /// BEGIN YOUR SOLUTION
-  
-  /// END YOUR SOLUTION
+    /// BEGIN YOUR SOLUTION
+    // determine carry "boundaries"
+    uint32_t *carry = new uint32_t[shape.size()];
+    carry[shape.size() - 1] = 1;
+    for (int i = shape.size() - 2; i >= 0; i--) { // Do not use `unsigned int`.
+        carry[i] = carry[i + 1] * shape[i + 1];
+    }
+
+    for (uint32_t idx = 0; idx < size; idx++) {
+        out->ptr[GetMemIdx(idx, carry, shape, strides, offset)] = val;
+    }
+    // free memory
+    delete[] carry;
+    /// END YOUR SOLUTION
 }
 
 void EwiseAdd(const AlignedArray& a, const AlignedArray& b, AlignedArray* out) {
@@ -254,8 +340,10 @@ void ReduceSum(const AlignedArray& a, AlignedArray* out, size_t reduce_size) {
   /// END YOUR SOLUTION
 }
 
+
 }  // namespace cpu
 }  // namespace needle
+
 
 PYBIND11_MODULE(ndarray_backend_cpu, m) {
   namespace py = pybind11;
@@ -285,8 +373,8 @@ PYBIND11_MODULE(ndarray_backend_cpu, m) {
     std::memcpy(out->ptr, a.request().ptr, out->size * ELEM_SIZE);
   });
 
-  m.def("fill", Fill);
-  m.def("compact", Compact);
+    m.def("fill", Fill);
+    m.def("compact", Compact);
   m.def("ewise_setitem", EwiseSetitem);
   m.def("scalar_setitem", ScalarSetitem);
   m.def("ewise_add", EwiseAdd);
