@@ -8,6 +8,8 @@ Ongoing project; **switch to the branch `hw` for details.**
 
 [10-414/714](https://dlsyscourse.org) *Deep Learning Systems* by [Carnegie Mellon University](https://www.cmu.edu)
 
+[CUDA SGEMM矩阵乘法优化笔记——从入门到cublas](https://zhuanlan.zhihu.com/p/518857175)
+
 [How To Optimize GEMM](https://github.com/flame/how-to-optimize-gemm)
 
 [Tiny CUDA NN](https://github.com/NVlabs/tiny-cuda-nn)
