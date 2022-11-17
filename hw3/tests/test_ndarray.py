@@ -54,12 +54,12 @@ def check_same_memory(original, view):
      "shape": (8, 8, 2, 2, 2, 2),
      "np_fn": lambda X: X[1:3, 5:8, 1:2, 0:1, 0:1, 1:2],
      "nd_fn": lambda X: X[1:3, 5:8, 1:2, 0:1, 0:1, 1:2]
-    }, 
+    },
     {
      "shape": (7, 8),
      "np_fn": lambda X: X.transpose()[3:7,2:5],
      "nd_fn": lambda X: X.permute((1, 0))[3:7,2:5]
-    },   
+    },
 ], ids=["transpose", "broadcast_to", "reshape1", "reshape2", "reshape3", "getitem1", "getitem2", "transposegetitem"])
 @pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])
 def test_compact(params, device):
@@ -288,15 +288,16 @@ def test_broadcast_to(device, params):
 
 
 matmul_dims = [(16, 16, 16), 
-    (8, 8, 8), 
-    (1, 2, 3), 
-    (3, 4, 5), 
-    (5, 4, 3), 
-    (64, 64, 64), 
-    (72, 72, 72), 
-    (72, 73, 74), 
-    (74, 73, 72), 
-    (128, 128, 128)]
+               (8 , 8 , 8 ),
+               (1 , 2 , 3 ),
+               (3 , 4 , 5 ),
+               (5 , 4 , 3 ),
+               (64, 64, 64),
+               (72, 72, 72),
+               (72, 73, 74),
+               (74, 73, 72),
+               #(128, 128, 128)]
+               (128, 128, 128), (192, 128, 64)]
 @pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])
 @pytest.mark.parametrize("m,n,p", matmul_dims)
 def test_matmul(m, n, p, device):
@@ -325,8 +326,22 @@ def test_scalar_div(device):
 def test_scalar_power(device):
     A = np.random.randn(5, 5)
     B = nd.array(A, device=device)
-    np.testing.assert_allclose(np.power(A, 5.), (B**5.).numpy(), atol=1e-5, rtol=1e-5)
-    np.testing.assert_allclose(np.power(A, 0.5), (B**0.5).numpy(), atol=1e-5, rtol=1e-5)
+    # see https://numpy.org/doc/stable/reference/random/generated/numpy.random.random_sample.html
+    #_A = np.random.random_sample((5,5))
+    #_B = nd.array(_A, device=device)
+    #np.testing.assert_allclose(np.power( A, -1  ), ( B**(-1)  ).numpy(), atol=1e-5, rtol=1e-5)
+    #np.testing.assert_allclose(np.power(_A, -1/2), (_B**(-1/2)).numpy(), atol=1e-5, rtol=1e-5)
+    #np.testing.assert_allclose(np.power(_A, -1/3), (_B**(-1/3)).numpy(), atol=1e-5, rtol=1e-5)
+    #np.testing.assert_allclose(np.power( A,  0  ), ( B**  0   ).numpy(), atol=1e-5, rtol=1e-5)
+    np.testing.assert_allclose(np.power( A,  0.5), ( B**  0.5 ).numpy(), atol=1e-5, rtol=1e-5)
+    #np.testing.assert_allclose(np.power(_A,  1/3), (_B**( 1/3)).numpy(), atol=1e-5, rtol=1e-5)
+    #np.testing.assert_allclose(np.power( A,  1  ), ( B**  1   ).numpy(), atol=1e-5, rtol=1e-5)
+    #np.testing.assert_allclose(np.power( A,  2  ), ( B**  2   ).numpy(), atol=1e-5, rtol=1e-5)
+    #np.testing.assert_allclose(np.power( A,  3  ), ( B**  3   ).numpy(), atol=1e-5, rtol=1e-5)
+    #np.testing.assert_allclose(np.power( A,  4  ), ( B**  4   ).numpy(), atol=1e-5, rtol=1e-5)
+    np.testing.assert_allclose(np.power( A,  5. ), ( B**  5.  ).numpy(), atol=1e-5, rtol=1e-5)
+    #np.testing.assert_allclose(np.power( A,  6  ), ( B**  6   ).numpy(), atol=1e-5, rtol=1e-5)
+    
 
 
 @pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])

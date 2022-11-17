@@ -486,17 +486,18 @@ class NDArray:
 
     ### Matrix multiplication
     def __matmul__(self, other):
-        """Matrix multiplication of two arrays.  This requires that both arrays
+        """Matrix multiplication of two arrays. This requires that both arrays
         be 2D (i.e., we don't handle batch matrix multiplication), and that the
         sizes match up properly for matrix multiplication.
         In the case of the CPU backend, you will implement an efficient "tiled"
         version of matrix multiplication for the case when all dimensions of
-        the array are divisible by self.device.__tile_size__.  In this case,
-        the code below will re-stride and compact the matrix into tiled form,
-        and then pass to the relevant CPU backend.  For the CPU version we will
-        just fall back to the naive CPU implementation if the array shape is not
-        a multiple of the tile size
-        The GPU (and numpy) versions don't have any tiled version (or rather,
+        the array are divisible by self.device.__tile_size__ (8 for CPU backend
+        and ? for CUDA backend). In this case, the code below will re-stride
+        and compact the matrix into tiled form, and then pass to the relevant
+        CPU backend.
+        For the CPU version we will just fall back to the naive CPU
+        implementation if the array shape is not a multiple of the tile size.
+        The GPU (and NumPy) versions don't have any tiled version (or rather,
         the GPU version will just work natively by tiling any input size).
         """
 
@@ -513,7 +514,8 @@ class NDArray:
             def tile(a, tile):
                 return a.as_strided(
                     (a.shape[0] // tile, a.shape[1] // tile, tile, tile),
-                    (a.shape[1] * tile, tile, self.shape[1], 1),
+                    #(a.shape[1] * tile, tile, self.shape[1], 1),
+                    (a.shape[1] * tile, tile, a.shape[1], 1)
                 )
 
             t = self.device.__tile_size__
@@ -551,14 +553,14 @@ class NDArray:
             )
         return view, out
 
-    def sum(self, axis=None):
-        view, out = self.reduce_view_out(axis)
-        self.device.reduce_sum(view.compact()._handle, out._handle, view.shape[-1])
-        return out
-
     def max(self, axis=None):
         view, out = self.reduce_view_out(axis)
         self.device.reduce_max(view.compact()._handle, out._handle, view.shape[-1])
+        return out
+    
+    def sum(self, axis=None):
+        view, out = self.reduce_view_out(axis)
+        self.device.reduce_sum(view.compact()._handle, out._handle, view.shape[-1])
         return out
 
 
@@ -571,7 +573,7 @@ def array(a, dtype="float32", device=None):
 
 def empty(shape, dtype="float32", device=None):
     device = device if device is not None else default_device()
-    return devie.empty(shape, dtype)
+    return device.empty(shape, dtype)
 
 
 def full(shape, fill_value, dtype="float32", device=None):
