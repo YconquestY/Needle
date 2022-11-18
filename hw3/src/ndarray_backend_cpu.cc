@@ -10,6 +10,7 @@
 #include <numeric> // for `std::accumulate`,
 #include <functional> // for `std::multiplies`
 #include <algorithm>  // for `std::max_element`
+#include <cstring>    // for `std::memset`
 
 namespace needle {
 namespace cpu    {
@@ -334,20 +335,20 @@ inline void AlignedDot(const float* __restrict__ a,
      *   out: compact 2D array of size TILE x TILE to write to
      */
 
-    a   = (const float*)__builtin_assume_aligned(a  , TILE * ELEM_SIZE);
-    b   = (const float*)__builtin_assume_aligned(b  , TILE * ELEM_SIZE);
-    out = (      float*)__builtin_assume_aligned(out, TILE * ELEM_SIZE);
+    a   = (const float*) __builtin_assume_aligned(a  , TILE * ELEM_SIZE);
+    b   = (const float*) __builtin_assume_aligned(b  , TILE * ELEM_SIZE);
+    out = (      float*) __builtin_assume_aligned(out, TILE * ELEM_SIZE);
 
     /// BEGIN YOUR SOLUTION
     for (uint32_t i = 0; i < TILE; i++)
     {
         for (uint32_t j = 0; j < TILE; j++)
         {
-            scalar_t entry = out[i * TILE + j];
+            scalar_t entry = 0.0f;
             for (uint32_t k = 0; k < TILE; k++) {
                 entry += a[i * TILE + k] * b[k * TILE + j];
             }
-            out[i * TILE + j] = entry;
+            out[i * TILE + j] += entry;
         }
     }
     /// END YOUR SOLUTION
@@ -376,9 +377,16 @@ void MatmulTiled(const AlignedArray& a, const AlignedArray& b, AlignedArray* out
      *
      */
     /// BEGIN YOUR SOLUTION
-    uint32_t m_tiles = m / TILE,
-             n_tiles = n / TILE,
-             p_tiles = p / TILE;
+    // Tiled MM requires accumulating intermediate results. Thus, `out->ptr`
+    // must be initialized to zeros. There are cases, in practice, where
+    // initial elements are extremely large, which means we have to zero out
+    // the array manually.
+    // see https://en.cppreference.com/w/cpp/string/byte/memset
+    out->ptr = (scalar_t*) std::memset((void*) out->ptr, 0, m * p * sizeof(scalar_t));
+
+    uint32_t m_tiles = (m + TILE - 1) / TILE,
+             n_tiles = (n + TILE - 1) / TILE,
+             p_tiles = (p + TILE - 1) / TILE;
     for (uint32_t i = 0; i < m_tiles; i++)
     {
         for (uint32_t j = 0; j < p_tiles; j++)

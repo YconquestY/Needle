@@ -518,7 +518,7 @@ class NDArray:
                     (a.shape[1] * tile, tile, a.shape[1], 1)
                 )
 
-            t = self.device.__tile_size__
+            t = self.device.__tile_size__ # 4 for CPU
             a = tile(self.compact(), t).compact()
             b = tile(other.compact(), t).compact()
             out = NDArray.make((a.shape[0], b.shape[1], t, t), device=self.device)

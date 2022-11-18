@@ -48,8 +48,8 @@ CudaDims CudaOneDim(size_t size)
     CudaDims dim;
     size_t num_blocks = (size + BASE_THREAD_NUM - 1) / BASE_THREAD_NUM; // round up
     // 1D threads in 1D blocks
-    dim.block = dim3(BASE_THREAD_NUM, 1, 1);
     dim.grid  = dim3(num_blocks     , 1, 1);
+    dim.block = dim3(BASE_THREAD_NUM, 1, 1);
 
     return dim;
 }
@@ -612,38 +612,72 @@ void ScalarPower  (const CudaArray& a, scalar_t val, CudaArray* out)
 ////////////////////////////////////////////////////////////////////////////////
 
 __global__ void MatMulNaiveKernel(const scalar_t* a, const scalar_t* b, scalar_t* out,
-                                  size_t M, size_t N, size_t P)
+                                  uint32_t M, uint32_t N, uint32_t P)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < M * P) {
         size_t x = tid % P,
                y = tid / P;
         scalar_t sum = 0.0f;
-        for (size_t i = 0; i < N; i++) {
+        for (uint32_t i = 0; i < N; i++) {
             sum += a[y * N + i] * b[i * P + x];
         }
         out[tid] = sum;
     }
 }
 
+// Each block contains `BASE_THREAD_NUM` (256) threads,
+// which correponds to 256 elements in a 16 x 16 tile.
+#define BLOCK 16
+
 __global__ void MatmulRegTileKernel(const scalar_t* a, const scalar_t* b, scalar_t* out,
                                     uint32_t M, uint32_t N, uint32_t P)
 {
-    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-    // determine entry index
-    size_t x = tid % P,
-           y = tid / P;
-    // determine block index
-    size_t xb = x % ((P + TILE - 1) / TILE),
-           yb = y / ((P + TILE - 1) / TILE);
-    if (x < P && y < M)
-    {
-        //for (int i = 0; i < ;)
-    }
+    // TODO
 }
 
-__global__ void MatmulSharedMemTileKernel()
-{}
+// see 2nd example in https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#shared-memory
+__global__ void MatmulSharedMemTileV0Kernel(const scalar_t* a, const scalar_t* b, scalar_t* out,
+                                            uint32_t M, uint32_t N, uint32_t P)
+{
+    // determine block position
+    uint32_t xBlock = blockIdx.x, yBlock = blockIdx.y,
+    // determine relative position
+             xTile = threadIdx.x, yTile = threadIdx.y,
+    // determine absolute position
+             x = xBlock * BLOCK + xTile,
+             y = yBlock * BLOCK + yTile;
+    // compute submatrix
+    scalar_t entry = 0.0f;
+    for (uint32_t i = 0; i < (N + BLOCK-1) / BLOCK; i++)
+    {
+        // determine submatrix position
+        const scalar_t *subA = &a[yBlock * BLOCK * N + i      * BLOCK],
+                       *subB = &b[i      * BLOCK * P + xBlock * BLOCK];
+        // load submatrices to shared memory
+        __shared__ scalar_t aTile[BLOCK][BLOCK],
+                            bTile[BLOCK][BLOCK];
+        aTile[yTile][xTile] = subA[yTile * N + xTile];
+        bTile[yTile][xTile] = subB[yTile * P + xTile];
+        // make sure submatrices are loaded before computation
+        __syncthreads();
+
+        for (uint32_t j = 0; j < BLOCK; j++) {
+            entry += aTile[yTile][j] * bTile[j][xTile]; // TODO: corner cases
+        }
+        // make sure computation completes before loading
+        __syncthreads();
+    }
+    //printf("%d, %d: %f\n", x, y, entry);
+    out[y * P + x] = entry;
+}
+
+// see https://zhuanlan.zhihu.com/p/518857175
+__global__ void MatmulSharedMemTileV1Kernel(const scalar_t* a, const scalar_t* b, scalar_t* out,
+                                            uint32_t M, uint32_t N, uint32_t P)
+{
+    // TODO
+}
 
 void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out,
             uint32_t M, uint32_t N, uint32_t P)
@@ -678,10 +712,23 @@ void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out,
     CudaDims dims = CudaOneDim(M * P);
     MatMulNaiveKernel<<<dims.grid, dims.block>>>(a.ptr, b.ptr, out->ptr, M, N, P);
     */
+    
     /// thread level: register tiling
-    MatmulRegTileKernel<<<dims.grid, dims.block>>>(a.ptr, b.ptr, out->ptr, M, N, P);
-    /// block level: shared memory tiling
     // TODO
+
+    /// block level: shared memory tiling
+    // WARNING
+    // Beware of corner cases where matrix dimensions are not multiples of
+    // `BLOCK`. This affects indices of elements.
+    // v0
+    dim3 grid((P + BLOCK-1) / BLOCK, (M + BLOCK-1) / BLOCK),
+         block(BLOCK, BLOCK);
+    MatmulSharedMemTileV0Kernel<<<grid, block>>>(a.ptr, b.ptr, out->ptr, M, N, P);
+    // v1
+    // Each block computes a 128 x 128 tile, and
+    // each thread computes an 8 x 8 patch in the tile.
+    // Thus, there are 256 threads per block.
+
     /// END YOUR SOLUTION
 }
 
