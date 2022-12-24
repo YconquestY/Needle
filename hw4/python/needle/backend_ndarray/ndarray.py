@@ -1,13 +1,18 @@
-import operator
-import math
+#import operator
+#import math
+from math import prod
 from functools import reduce
 import numpy as np
 from . import ndarray_backend_numpy
 from . import ndarray_backend_cpu
 
 # math.prod not in Python 3.7
-def prod(x):
-    return reduce(operator.mul, x, 1)
+# WARNING
+# The trailing `1` is required as an initializer to `reduce`.
+# Otherwise, there will be an error when the iterable is empty.
+# see https://docs.python.org/3/library/functools.html#functools.reduce
+#def prod(x):
+#    return reduce(operator.mul, x, 1)
 
 
 class BackendDevice:
@@ -142,6 +147,8 @@ class NDArray:
         array._offset = offset
         array._device = device if device is not None else default_device()
         if handle is None:
+            # When `shape` is `()`, i.e., an empty tuple,
+            # `prod(shape)` will be 1 by convention.
             array._handle = array.device.Array(prod(shape))
         else:
             array._handle = handle
@@ -217,13 +224,13 @@ class NDArray:
             )
             return out
 
-    def as_strided(self, shape, strides):
+    def as_strided(self, shape, strides, offset=0):
         """ Restride the matrix without copying memory. """
         assert len(shape) == len(strides)
-        return NDArray.make(
-            shape, strides=strides, device=self.device, handle=self._handle
-        )
-
+        return NDArray.make(shape, strides=strides,
+                                   device=self.device,
+                                   handle=self._handle,
+                                   offset=offset)
     @property
     def flat(self):
         return self.reshape((self.size,))
@@ -321,7 +328,7 @@ class NDArray:
         if start == None:
             start = 0
         if start < 0:
-            start = self.shape[dim]
+            start = self.shape[dim] + stop
         if stop == None:
             stop = self.shape[dim]
         if stop < 0:
@@ -408,23 +415,35 @@ class NDArray:
 
     ### Collection of elementwise and scalar function: add, multiply, boolean, etc
 
+    # There are 2 kernel invocation schemes below. The latter deals in
+    # particular with single-item arrays, where scalar kernels should be used
+    # to save broading time and memory. Nevertheless, it violates Occam's razor
+    # and cause problems in undetermined cases. A wiser solution is to be found.
     def ewise_or_scalar(self, other, ewise_func, scalar_func):
+    #def ewise_or_scalar(self, other, ewise_func, scalar_func,
+    #                                             pscalar_func=None):
         """Run either an elementwise or scalar version of a function,
         depending on whether "other" is an NDArray or scalar
         """
         out = NDArray.make(self.shape, device=self.device)
         if isinstance(other, NDArray):
-            assert self.shape == other.shape, "operation needs two equal-sized arrays"
-            ewise_func(self.compact()._handle, other.compact()._handle, out._handle)
+           assert self.shape == other.shape, "operation needs two equal-sized arrays"
+           ewise_func(self.compact()._handle, other.compact()._handle, out._handle)
         else:
-            scalar_func(self.compact()._handle, other, out._handle)
+           scalar_func(self.compact()._handle, other, out._handle)
+        #if not isinstance(other, NDArray):
+        #    scalar_func(self.compact()._handle, other, out._handle)
+        #elif other.size == 1:
+        #    pscalar_func(self.compact()._handle, other._handle, out._handle)
+        #else:
+        #    assert self.shape == other.shape, "operation needs two equal-sized arrays"
+        #    ewise_func(self.compact()._handle, other.compact()._handle, out._handle)
         return out
 
     def __add__(self, other):
-        return self.ewise_or_scalar(
-            other, self.device.ewise_add, self.device.scalar_add
-        )
-
+        return self.ewise_or_scalar(other, self.device.ewise_add,
+                                           self.device.scalar_add,
+                                           )#self.device.pscalar_add)
     __radd__ = __add__
 
     def __sub__(self, other):
@@ -555,9 +574,13 @@ class NDArray:
 
         if axis is None:
             view = self.compact().reshape((1,) * (self.ndim - 1) + (prod(self.shape),))
-            out = NDArray.make((1,) * (self.ndim if keepdims else 1), device=self.device)
-
-
+            # The key difference of the following line is the shape of the
+            # return value when `axis` of a reduction operation is `None`.
+            # Needle adopts `(1,)`, while other libraries——such as Pytorch
+            # and NumPy——uses `()`.
+            out = NDArray.make(shape=(1,) * (self.ndim if keepdims else 1),
+            #out = NDArray.make(shape=(1,) * self.ndim if keepdims else (),
+                               device=self.device)
         else:
             if isinstance(axis, (tuple, list)):
                 assert len(axis) == 1, "Only support reduction over a single axis"

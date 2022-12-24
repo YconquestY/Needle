@@ -142,9 +142,11 @@ def test_tanh_backward(shape, device):
     backward_check(ndl.tanh, A)
 
 
-STACK_PARAMETERS = [((5, 5), 0, 1),
-    ((5, 5), 0, 2),
-    ((1,5,7), 2, 5)]
+STACK_PARAMETERS = [
+    ((5, 5) , 0, 1),
+    ((5, 5) , 0, 2),
+    ((1,5,7), 2, 5)
+]
 @pytest.mark.parametrize("shape, axis, l", STACK_PARAMETERS)
 @pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])
 def test_stack(shape, axis, l, device):
@@ -170,7 +172,8 @@ def test_stack_backward(shape, axis, l, device):
         np.testing.assert_allclose(A_t[i].grad.numpy(), A[i].grad.numpy(), atol=1e-5, rtol=1e-5)
 
 
-SUMMATION_PARAMETERS = [((1, 1, 1), None),
+SUMMATION_PARAMETERS = [
+    ((1, 1, 1), None),
     ((5, 3), 0),
     ((8, 3, 2), 1),
     ((8, 3, 2), 2)
@@ -191,8 +194,10 @@ def test_summation_backward(shape, axes, device):
     backward_check(ndl.summation, A, axes=axes)
 
 
-BROADCAST_SHAPES = [((1, 1, 1), (3, 3, 3)),
-    ((4, 1, 6), (4, 3, 6))]
+BROADCAST_SHAPES = [
+    ((1, 1, 1), (3, 3, 3)),
+    ((4, 1, 6), (4, 3, 6))
+]
 @pytest.mark.parametrize("shape,shape_to", BROADCAST_SHAPES)
 @pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])
 def test_broadcast_to(shape, shape_to, device):

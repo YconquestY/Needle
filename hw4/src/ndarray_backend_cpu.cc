@@ -26,7 +26,7 @@ struct AlignedArray
     {
         // see https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_memalign.html
         // Weirdly, there is no manual for the API from CL.
-        int ret = posix_memalign((void**)&ptr, ALIGNMENT, size * ELEM_SIZE);
+        int ret = posix_memalign((void**) &ptr, ALIGNMENT, size * ELEM_SIZE);
         if (ret != 0) {
             throw std::bad_alloc();
         }
@@ -242,7 +242,15 @@ void ScalarOp(const AlignedArray& a, scalar_t val, AlignedArray* out,
         out->ptr[i] = op(a.ptr[i], val);
     }
 }
-
+/*
+void PScalarOp(const AlignedArray& a, const AlignedArray& b, AlignedArray* out,
+               scalar_t (*op)(scalar_t, scalar_t))
+{
+    for (size_t i = 0; i < a.size; i++) {
+        out->ptr[i] = op(a.ptr[i], b.ptr[0]);
+    }
+}
+*/
 scalar_t add(scalar_t a, scalar_t b) { return a + b; }
 scalar_t mul(scalar_t a, scalar_t b) { return a * b; }
 scalar_t div(scalar_t a, scalar_t b) { return a / b; }
@@ -271,6 +279,8 @@ void ScalarPower  (const AlignedArray& a, scalar_t val, AlignedArray* out) { Sca
 void ScalarMaximum(const AlignedArray& a, scalar_t val, AlignedArray* out) { ScalarOp(a, val, out, max); }
 void ScalarEq     (const AlignedArray& a, scalar_t val, AlignedArray* out) { ScalarOp(a, val, out, eq ); }
 void ScalarGe     (const AlignedArray& a, scalar_t val, AlignedArray* out) { ScalarOp(a, val, out, ge ); }
+
+//void PScalarAdd(const AlignedArray& a, AlignedArray& b, AlignedArray* out) { PScalarOp(a, b, out, add); }
 /// END YOUR SOLUTION
 
 void Matmul(const AlignedArray& a, const AlignedArray& b, AlignedArray* out,
@@ -473,12 +483,13 @@ PYBIND11_MODULE(ndarray_backend_cpu, m) {
     m.def("ewise_setitem" , EwiseSetitem );
     m.def("scalar_setitem", ScalarSetitem);
 
-    m.def("ewise_add" , EwiseAdd );
-    m.def("scalar_add", ScalarAdd);
-    m.def("ewise_mul" , EwiseMul );
-    m.def("scalar_mul", ScalarMul);
-    m.def("ewise_div" , EwiseDiv );
-    m.def("scalar_div", ScalarDiv);
+    m.def("ewise_add"  , EwiseAdd  );
+    m.def("scalar_add" , ScalarAdd );
+    //m.def("pscalar_add", PScalarAdd);
+    m.def("ewise_mul"  , EwiseMul  );
+    m.def("scalar_mul" , ScalarMul );
+    m.def("ewise_div"  , EwiseDiv  );
+    m.def("scalar_div" , ScalarDiv );
     m.def("scalar_power", ScalarPower);
 
     m.def("ewise_maximum" , EwiseMaximum );

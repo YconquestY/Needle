@@ -52,7 +52,7 @@ def xavier_uniform(fan_in, fan_out, gain=1.0, **kwargs):
     a = gain * math.sqrt(6. / (fan_in + fan_out))
     return rand(fan_in, fan_out,
                 low=-a, high=a,
-                **kwargs) # What does `**kwargs` include?
+                **kwargs)
     ### END YOUR SOLUTION
 
 

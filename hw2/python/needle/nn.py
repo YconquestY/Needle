@@ -124,7 +124,7 @@ class Linear(Module):
             return X @ self.weight
         else:
             return X @ self.weight + ops.broadcast_to(bias,
-                                                      X.shape[ :-1] + (self.out_features,))           
+                                                      X.shape[ :-1] + (self.out_features,))
         ### END YOUR SOLUTION
 
 

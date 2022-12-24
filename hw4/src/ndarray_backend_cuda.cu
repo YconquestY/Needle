@@ -280,12 +280,16 @@ void ScalarSetitem(size_t size, scalar_t val, CudaArray* out,
 // Elementwise and scalar operations
 ////////////////////////////////////////////////////////////////////////////////
 
-__global__ void EwiseAddKernel(const scalar_t* a, const scalar_t* b, scalar_t* out, size_t size) {
+__global__ void EwiseAddKernel(const scalar_t* a, const scalar_t* b, scalar_t* out, size_t size)
+{
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < size) out[tid] = a[tid] + b[tid];
+    if (tid < size) {
+        out[tid] = a[tid] + b[tid];
+    }
 }
 
-void EwiseAdd(const CudaArray& a, const CudaArray& b, CudaArray* out) {
+void EwiseAdd(const CudaArray& a, const CudaArray& b, CudaArray* out)
+{
     /**
      * Add together two CUDA array
      */
@@ -293,12 +297,16 @@ void EwiseAdd(const CudaArray& a, const CudaArray& b, CudaArray* out) {
     EwiseAddKernel<<<dim.grid, dim.block>>>(a.ptr, b.ptr, out->ptr, out->size);
 }
 
-__global__ void ScalarAddKernel(const scalar_t* a, scalar_t val, scalar_t* out, size_t size) {
+__global__ void ScalarAddKernel(const scalar_t* a, scalar_t val, scalar_t* out, size_t size)
+{
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < size) out[tid] = a[tid] + val;
+    if (tid < size) {
+        out[tid] = a[tid] + val;
+    }
 }
 
-void ScalarAdd(const CudaArray& a, scalar_t val, CudaArray* out) {
+void ScalarAdd(const CudaArray& a, scalar_t val, CudaArray* out)
+{
     /**
      * Add together a CUDA array and a scalar value.
      */
@@ -350,7 +358,13 @@ void ScalarAdd(const CudaArray& a, scalar_t val, CudaArray* out) {
                 CudaDims dim = CudaOneDim(out->size); \
                 OpKernel<<<dim.grid, dim.block>>>(a.ptr, val, out->ptr, out->size); \
             } while (0)
-
+// pseudo-scalar operation
+#define PSCALAR_OP(a, b, out,                         \
+                   OpKernel)                          \
+            do {                                      \
+                CudaDims dim = CudaOneDim(out->size); \
+                OpKernel<<<dim.grid, dim.block>>>(a.ptr, b.ptr, out->ptr, out->size); \
+            } while (0)
 
 __global__ void EwiseMulKernel(const scalar_t* a, const scalar_t* b, scalar_t* out, size_t size)
 {
@@ -421,7 +435,15 @@ __global__ void EwiseTanhKernel(const scalar_t* a, scalar_t* out, size_t size)
     }
 }
 
-
+/*
+__global__ void PScalarAddKernel(const scalar_t* a, scalar_t* b, scalar_t* out, size_t size)
+{
+    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < size) {
+        out[tid] = a[tid] + b[0];
+    }
+}
+*/
 __global__ void ScalarMulKernel(const scalar_t* a, scalar_t val, scalar_t* out, size_t size)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -604,6 +626,8 @@ void ScalarPower  (const CudaArray& a, scalar_t val, CudaArray* out)
     else if (std::abs(val - 6.0f     ) < EPS) { HexaKernel    <<<dims.grid, dims.block>>>(a.ptr, out->ptr, out->size); }
     else                                    { ScalarPowerKernel<<<dims.grid, dims.block>>>(a.ptr, val, out->ptr, out->size); }
 }
+
+//void PScalarAdd(const CudaArray& a, const CudaArray& b, CudaArray* out) { PSCALAR_OP(a, b, out, PScalarAddKernel); }
 
 /// END YOUR SOLUTION
 
@@ -811,12 +835,13 @@ PYBIND11_MODULE(ndarray_backend_cuda, m) {
     m.def("ewise_setitem" , EwiseSetitem );
     m.def("scalar_setitem", ScalarSetitem);
 
-    m.def("ewise_add" , EwiseAdd );
-    m.def("scalar_add", ScalarAdd);
-    m.def("ewise_mul" , EwiseMul );
-    m.def("scalar_mul", ScalarMul);
-    m.def("ewise_div" , EwiseDiv );
-    m.def("scalar_div", ScalarDiv);
+    m.def("ewise_add"  , EwiseAdd  );
+    m.def("scalar_add" , ScalarAdd );
+    //m.def("pscalar_add", PScalarAdd);
+    m.def("ewise_mul"  , EwiseMul  );
+    m.def("scalar_mul" , ScalarMul );
+    m.def("ewise_div"  , EwiseDiv  );
+    m.def("scalar_div" , ScalarDiv );
     m.def("scalar_power", ScalarPower);
 
     m.def("ewise_maximum" , EwiseMaximum );

@@ -171,7 +171,6 @@ class MNISTDataset(Dataset):
         except AttributeError:
             self.img, self.lbl = parse_mnist(self.image_filename, self.label_filename)
             return len(self.lbl)
-        
         ### END YOUR SOLUTION
 
 

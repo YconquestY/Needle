@@ -1,7 +1,7 @@
 import numpy as np
 from .autograd import Tensor
 import os
-import pickle
+import struct, gzip, pickle
 from typing import Iterator, Optional, List, Sized, Union, Iterable, Any
 from needle import backend_ndarray as nd
 
