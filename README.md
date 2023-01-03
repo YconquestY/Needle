@@ -2,6 +2,16 @@
 
 This repository is for homework in [CMU 10-414/714](https://dlsyscourse.org) *Deep Learning Systems* (fall 2022).
 
+## WARNING
+
+- Needle does **not** support implicit broadcasting.
+- Make sure to compact a tensor before reshaping it.
+
+## TODO
+
+- [ ] Extracting a scalar from an NDArray or a tensor<br>
+  Needle does **not** support turning a single-entry tensor to a Python number via the [`item`](https://pytorch.org/docs/stable/generated/torch.Tensor.item.html) method. Nor does its backend array support "extracting" a Python scalar through indexing with [`__getitem__`](https://github.com/YconquestY/Needle/blob/hw/hw3/python/needle/backend_ndarray/ndarray.py#L333). This affects the choice of kernels when performing operations on singleton tensors. As NDArray, they are not recognized as scalars, and are **broadcast** before **elementwise** kernels are invoked. The broadcasting procedure wastes time as well as memory, and **a wiser solution is to be found.**
+
 ## (TL; DR) Needle explained
 
 - Taking tensor addition for example, Needle operations are performed as follows:[^call_stack]<br>

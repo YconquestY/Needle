@@ -177,6 +177,69 @@ class MNISTDataset(Dataset):
         ### END YOUR SOLUTION
 
 
+class CIFAR10Dataset(Dataset):
+    def __init__(
+        self,
+        base_folder: str,
+        train: bool,
+        p: Optional[int] = 0.5,
+        transforms: Optional[List] = None
+    ):
+        """
+        Parameters:
+        base_folder - cifar-10-batches-py folder filepath
+        train       - bool, if True load training dataset, else load test dataset
+        Divide pixel values by 255. so that images are in 0-1 range.
+        Attributes:
+        X - NumPy array of images
+        y - NumPy array of labels
+        """
+        ### BEGIN YOUR SOLUTION
+        self.train = train
+        if train:
+            self.img = np.empty(shape=(50000, 3072),
+                                dtype=np.uint8)
+            self.lbl = np.empty(shape=(50000,),
+                                dtype=np.float32)
+            # Training data are packed into 5 files.
+            # see https://www.cs.toronto.edu/~kriz/cifar.html
+            for i in range(5):
+                with open(os.path.join(base_folder, f'data_batch_{i+1}'), 'rb') as f:
+                    training_batch = pickle.load(f, encoding='bytes')
+                self.img[i * 10000 : (i+1) * 10000] = training_batch[b'data']
+                self.lbl[i * 10000 : (i+1) * 10000] = np.array(training_batch[b'labels'],
+                                                               dtype=np.float32)
+        else:
+            with open(os.path.join(base_folder, 'test_batch'), 'rb') as f:
+                test_set = pickle.load(f, encoding='bytes')
+            self.img = test_set[b'data']
+            self.lbl = np.array(test_set[b'labels'],
+                                dtype=np.float32)
+        self.transforms = transforms
+        self.transforms_fn = lambda I, singleton : \
+                                    self.apply_transforms(I.astype(np.float32).reshape((3, 32, 32) if   singleton \
+                                                                                                   else (-1, 3, 32, 32)) / 255.)
+        ### END YOUR SOLUTION
+
+    def __getitem__(self, index) -> object:
+        """
+        Returns the image, label at given index
+        Image should be of shape (3, 32, 32)
+        """
+        ### BEGIN YOUR SOLUTION
+        return self.transforms_fn(self.img[index],
+                                  isinstance(index, int)), self.lbl[index]
+        ### END YOUR SOLUTION
+
+    def __len__(self) -> int:
+        """
+        Returns the total number of examples in the dataset
+        """
+        ### BEGIN YOUR SOLUTION
+        return 50000 if self.train else 10000
+        ### END YOUR SOLUTION
+
+
 class DataLoader:
     r"""
     Data loader. Combines a dataset and a sampler, and provides an iterable over
@@ -231,45 +294,6 @@ class DataLoader:
             self.num_iter += 1
             batch = self.dataset[batch_idx]
             return tuple(map(tensorify, batch))
-        ### END YOUR SOLUTION
-
-
-class CIFAR10Dataset(Dataset):
-    def __init__(
-        self,
-        base_folder: str,
-        train: bool,
-        p: Optional[int] = 0.5,
-        transforms: Optional[List] = None
-    ):
-        """
-        Parameters:
-        base_folder - cifar-10-batches-py folder filepath
-        train - bool, if True load training dataset, else load test dataset
-        Divide pixel values by 255. so that images are in 0-1 range.
-        Attributes:
-        X - numpy array of images
-        y - numpy array of labels
-        """
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
-
-    def __getitem__(self, index) -> object:
-        """
-        Returns the image, label at given index
-        Image should be of shape (3, 32, 32)
-        """
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
-
-    def __len__(self) -> int:
-        """
-        Returns the total number of examples in the dataset
-        """
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
         ### END YOUR SOLUTION
 
 
