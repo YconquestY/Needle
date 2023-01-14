@@ -514,13 +514,13 @@ class Stack(TensorOp):
         # stack tensors
         # see https://forum.dlsyscourse.org/t/stack-op-could-someone-share-some-idea-about-how-to-implement-stack-op/2804
         ndim = len(shape)
-        result = array_api.empty(shape=shape[ :self.axis] + (len(args),) + shape[self.axis: ],
-                                 device=device)
+        out = array_api.empty(shape=shape[ :self.axis] + (len(args),) + shape[self.axis: ],
+                              device=device)
         for i, tensor in enumerate(args):
             # see https://forum.dlsyscourse.org/t/q1-stack-issue-with-setitem/2887/2
             idx = (slice(None),) * self.axis + (i,) + (slice(None),) * (ndim - self.axis)
-            result[idx] = tensor
-        return result
+            out[idx] = tensor
+        return out
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
@@ -547,13 +547,13 @@ class Split(TensorTupleOp):
     def compute(self, A):
         ### BEGIN YOUR SOLUTION
         shape = A.shape[ :self.axis] + A.shape[self.axis+1: ]
-        result = []
+        out = []
         for i in range(A.shape[self.axis]):
             idx = (slice(None),) * self.axis + (i,) + (slice(None),) * (len(shape) - self.axis)
             # Do not forget to compact a tensor before reshaping it.
-            result.append(array_api.reshape(A[idx].compact(),
-                                            new_shape=shape))
-        return tuple(result)
+            out.append(array_api.reshape(A[idx].compact(),
+                                         new_shape=shape))
+        return tuple(out)
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
@@ -573,12 +573,13 @@ class Flip(TensorOp):
 
     def compute(self, a):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return a.flip(self.axes)
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return (flip(out_grad,
+                     self.axes),) # a deliberate tuple
         ### END YOUR SOLUTION
 
 
@@ -590,16 +591,36 @@ def flip(a, axes):
 class Dilate(TensorOp):
     def __init__(self, axes: tuple, dilation: int):
         self.axes = axes
+        assert dilation >= 0, 'dilation must be non-negative'
         self.dilation = dilation
 
     def compute(self, a):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        # positive dilation
+        if self.dilation:
+            stride = self.dilation + 1
+            dilated_shape = tuple(size * stride
+                                  if   axis in self.axes
+                                  else size
+                                  for  axis, size in enumerate(a.shape))
+            out = array_api.full(shape=dilated_shape,
+                                 fill_value=0.,
+                                 device=a.device)
+            idx = tuple(slice(None, None, stride)
+                        if   axis in self.axes
+                        else slice(None)
+                        for  axis in range(a.ndim))
+            out[idx] = a
+            return out
+        # 0 dilation
+        return a
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return (undilate(out_grad,
+                         self.axes,
+                         self.dilation),) # a deliberate tuple
         ### END YOUR SOLUTION
 
 
@@ -609,16 +630,33 @@ def dilate(a, axes, dilation):
 class UnDilate(TensorOp):
     def __init__(self, axes: tuple, dilation: int):
         self.axes = axes
+        assert dilation >= 0, 'dilation must be non-negative'
         self.dilation = dilation
 
     def compute(self, a):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        # positive dilation
+        if self.dilation:
+            stride = self.dilation + 1
+            undilated_shape = tuple(int(size / stride) if axis in self.axes
+                                                          else size
+                                                          for  axis, size in enumerate(a.shape))
+            out = array_api.empty(shape=undilated_shape,
+                                  device=a.device)
+            idx = tuple(slice(None, None, (stride)) if   axis in self.axes
+                                                    else slice(None)
+                                                    for  axis in range(a.ndim))
+            out = a[idx]
+            return out
+        # 0 dilation
+        return a
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return (dilate(out_grad,
+                       self.axes,
+                       self.dilation),) # a deliberate tuple
         ### END YOUR SOLUTION
 
 

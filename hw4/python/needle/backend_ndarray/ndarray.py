@@ -1,7 +1,8 @@
-#import operator
+#from operator import mul
 #import math
 from math import prod
-from functools import reduce
+#from functools import reduce
+from typing import Optional
 import numpy as np
 from . import ndarray_backend_numpy
 from . import ndarray_backend_cpu
@@ -12,7 +13,7 @@ from . import ndarray_backend_cpu
 # Otherwise, there will be an error when the iterable is empty.
 # see https://docs.python.org/3/library/functools.html#functools.reduce
 #def prod(x):
-#    return reduce(operator.mul, x, 1)
+#    return reduce(mul, x, 1)
 
 
 class BackendDevice:
@@ -137,7 +138,7 @@ class NDArray:
         return tuple(res[::-1])
 
     @staticmethod
-    def make(shape, strides=None, device=None, handle=None, offset=0):
+    def make(shape, strides=None, offset=0, device=None, handle=None):
         """Create a new NDArray with the given properties.  This will allocation the
         memory if handle=None, otherwise it will use the handle of an existing
         array."""
@@ -227,10 +228,9 @@ class NDArray:
     def as_strided(self, shape, strides, offset=0):
         """ Restride the matrix without copying memory. """
         assert len(shape) == len(strides)
-        return NDArray.make(shape, strides=strides,
-                                   device=self.device,
-                                   handle=self._handle,
-                                   offset=offset)
+        return NDArray.make(shape, strides, offset,
+                            device=self.device,
+                            handle=self._handle)
     @property
     def flat(self):
         return self.reshape((self.size,))
@@ -327,11 +327,13 @@ class NDArray:
         start, stop, step = sl.start, sl.stop, sl.step
         if start == None:
             start = 0
-        if start < 0:
-            start = self.shape[dim] + stop
+        #if start < 0:
+        elif start < 0:
+            start = self.shape[dim] + start
         if stop == None:
             stop = self.shape[dim]
-        if stop < 0:
+        #if stop < 0:
+        elif stop < 0:
             stop = self.shape[dim] + stop
         if step == None:
             step = 1
@@ -375,12 +377,9 @@ class NDArray:
         # handle singleton as tuple, everything as slices
         if not isinstance(idxs, tuple):
             idxs = (idxs,)
-        idxs = tuple(
-            [
-                self.process_slice(s, i) if isinstance(s, slice) else slice(s, s + 1, 1)
-                for i, s in enumerate(idxs)
-            ]
-        )
+        idxs = tuple(self.process_slice(s, i) if   isinstance(s, slice)
+                                              else slice(s, s + 1, 1)
+                                              for  i, s in enumerate(idxs))
         assert len(idxs) == self.ndim, "Need indexes equal to number of dimensions"
 
         ### BEGIN YOUR SOLUTION
@@ -608,24 +607,57 @@ class NDArray:
         return out
 
 
-    def flip(self, axes):
+    def flip(self, axes: Optional[tuple]):
         """
-        Flip this ndarray along the specified axes.
+        Flip this NDArray along the specified axes.
         Note: compact() before returning.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if axes is None:
+            axes = tuple(range(self.ndim))
+        elif isinstance(axes, int):
+            axes = (axes,)
+        assert isinstance(axes, tuple), 'axes must be put in tuple'
+        
+        offset = 0
+        strides = (self.size,) + self.strides
+        for axis in axes:
+            offset += strides[axis] - strides[axis+1]
+        strides = tuple(-stride if   axis in axes
+                                else stride
+                                for  axis, stride in enumerate(self.strides))
+        # The following are equivalent.
+        #return NDArray.make(shape=self.shape,
+        #                    strides=strides,
+        #                    offset=offset,
+        #                    device=self.device,
+        #                    handle=self._handle).compact()
+        return self.as_strided(shape=self.shape,
+                               strides=strides,
+                               offset=offset).compact()
         ### END YOUR SOLUTION
 
 
     def pad(self, axes):
         """
-        Pad this ndarray by zeros by the specified amount in `axes`,
-        which lists for _all_ axes the left and right padding amount, e.g.,
-        axes = ( (0, 0), (1, 1), (0, 0)) pads the middle axis with a 0 on the left and right side.
+        Pad this ndarray by zeros by the specified amount in `axes`, which lists
+        for all axes the left and right padding amount, e.g.,
+        axes = ((0, 0), (1, 1), (0, 0)) pads the middle axis with a 0 on the
+        left and right side.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        assert len(axes) == self.ndim, 'NDArray dimension mismatch'
+        padded_shape = tuple(size + sum(pad_width) for size, pad_width in zip(self.shape, axes))
+        # The following are equivalent.
+        #out = NDArray.make(shape=padded_shape,
+        #                   device=self.device)
+        #out.fill(0.)
+        out = self.device.full(shape=padded_shape,
+                               fill_value=0.)
+        idx = tuple(slice(pad_width[0], -pad_width[1] if   pad_width[1] \
+                                                      else None, 1) for pad_width in axes)
+        out[idx] = self
+        return out
         ### END YOUR SOLUTION
 
 

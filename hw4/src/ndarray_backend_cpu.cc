@@ -53,10 +53,13 @@ void Fill(AlignedArray* out, scalar_t val)
     }
 }
 
+// Use signed integers when dealing with `strides`. Otherwise, flipping an
+// NDArray will fail.
+// see https://forum.dlsyscourse.org/t/q3-flip-typeerror-to-numpy-incompatible-function-arguments/2862/9
 
 /// BEGIN YOUR SOLUTION
 uint32_t GetMemIdx(uint32_t idx, uint32_t* carry,
-                   std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+                   std::vector<uint32_t> shape, std::vector<int32_t> strides, size_t offset)
 {
     /**
      * Get the actual index of an array element in memory. The index strategy
@@ -86,7 +89,7 @@ uint32_t GetMemIdx(uint32_t idx, uint32_t* carry,
 // This is because we do not write to a populated array.
 // see https://stackoverflow.com/questions/57483/what-are-the-differences-between-a-pointer-variable-and-a-reference-variable
 void Compact(const AlignedArray& a, AlignedArray* out,
-             std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+             std::vector<uint32_t> shape, std::vector<int32_t> strides, size_t offset)
 {
     /**
      * Compact an array in memory
@@ -124,7 +127,7 @@ void Compact(const AlignedArray& a, AlignedArray* out,
 }
 
 void EwiseSetitem(const AlignedArray& a, AlignedArray* out,
-                  std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+                  std::vector<uint32_t> shape, std::vector<int32_t> strides, size_t offset)
 {
     /**
      * Set items in a (non-compact) array
@@ -155,7 +158,7 @@ void EwiseSetitem(const AlignedArray& a, AlignedArray* out,
 }
 
 void ScalarSetitem(const size_t size, scalar_t val, AlignedArray* out,
-                   std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+                   std::vector<uint32_t> shape, std::vector<int32_t> strides, size_t offset)
 {
     /**
      * Set items in a (non-compact) array

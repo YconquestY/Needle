@@ -55,10 +55,17 @@ CudaDims CudaOneDim(size_t size)
 }
 
 #define MAX_VEC_SIZE 8
+
 struct CudaVec
 {
     uint32_t size;
     uint32_t data[MAX_VEC_SIZE];
+};
+
+struct CudaStrides
+{
+    uint32_t size;
+     int32_t data[MAX_VEC_SIZE];
 };
 
 CudaVec VecToCuda(const std::vector<uint32_t>& x)
@@ -73,6 +80,20 @@ CudaVec VecToCuda(const std::vector<uint32_t>& x)
         shape.data[i] = x[i];
     }
     return shape;
+}
+
+CudaStrides StridesToCuda(const std::vector<int32_t>& x)
+{
+    CudaStrides strides;
+    // `shape` or `strides` cannot exceed 8D.
+    if (x.size() > MAX_VEC_SIZE) {
+        throw std::runtime_error("Exceeded CUDA supported max dimesions");
+    }
+    strides.size = x.size();
+    for (size_t i = 0; i < x.size(); i++) {
+        strides.data[i] = x[i];
+    }
+    return strides;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -104,7 +125,7 @@ CudaVec GetCarry(std::vector<uint32_t> shape)
      */
     CudaVec carry;
     // Altough a tensor should not exceed 8D, we do not check it here. Instead,
-    // it is handled by `VecToCuda(shape)`.
+    // it is handled by `VecToCuda(shape)` or `StridesToCuda(strides)`.
     carry.size = shape.size();
 
     carry.data[carry.size - 1] = 1;
@@ -115,13 +136,16 @@ CudaVec GetCarry(std::vector<uint32_t> shape)
     return carry;
 }
 
+// Use signed integers when dealing with `strides`. Otherwise, flipping an
+// NDArray will fail.
+// see https://forum.dlsyscourse.org/t/q3-flip-typeerror-to-numpy-incompatible-function-arguments/2862/9
 
 // Untility function to convert contiguous index i to memory location from strides
 //
 // The `__device__` execution space specifier declares a function callable only
 // from a device, see https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#device-function-specifier
 __device__ uint32_t GetMemIdx(uint32_t tid, CudaVec carry,
-                              CudaVec shape, CudaVec strides, size_t offset)
+                              CudaVec shape, CudaStrides strides, size_t offset)
 {
     /**
      * Get the actual index of an array element in memory. The index strategy
@@ -147,7 +171,7 @@ __device__ uint32_t GetMemIdx(uint32_t tid, CudaVec carry,
 
 
 __global__ void CompactKernel(const scalar_t* a, scalar_t* out,
-                              size_t size, CudaVec shape, CudaVec strides, size_t offset,
+                              size_t size, CudaVec shape, CudaStrides strides, size_t offset,
                               CudaVec carry)
 {
     /**
@@ -174,7 +198,7 @@ __global__ void CompactKernel(const scalar_t* a, scalar_t* out,
 }
 
 void Compact(const CudaArray& a, CudaArray* out,
-             std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+             std::vector<uint32_t> shape, std::vector<int32_t> strides, size_t offset)
 {
     /**
      * Compact an array in memory. Unlike the C++ version, in CUDA this will
@@ -196,14 +220,14 @@ void Compact(const CudaArray& a, CudaArray* out,
     // to kernel invocation.
     CudaDims dim = CudaOneDim(out->size);
     CompactKernel<<<dim.grid, dim.block>>>(a.ptr, out->ptr,
-                                           out->size, VecToCuda(shape), VecToCuda(strides), offset,
+                                           out->size, VecToCuda(shape), StridesToCuda(strides), offset,
                                            GetCarry(shape));
 }
 
 
 /// BEGIN YOUR SOLUTION
 __global__ void EwiseSetitemKernel(const scalar_t* a, scalar_t* out,
-                                   size_t size, CudaVec shape, CudaVec strides, size_t offset,
+                                   size_t size, CudaVec shape, CudaStrides strides, size_t offset,
                                    CudaVec carry)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -214,7 +238,7 @@ __global__ void EwiseSetitemKernel(const scalar_t* a, scalar_t* out,
 /// END YOUR SOLUTION
 
 void EwiseSetitem(const CudaArray& a, CudaArray* out,
-                  std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+                  std::vector<uint32_t> shape, std::vector<int32_t> strides, size_t offset)
 {
     /**
      * Set items in a (non-compact) array using CUDA.  You will most likely want to implement a
@@ -232,7 +256,7 @@ void EwiseSetitem(const CudaArray& a, CudaArray* out,
     // see https://forum.dlsyscourse.org/t/q6-setitem-in-gpu-version/2641/3
     CudaDims dim = CudaOneDim(a.size);
     EwiseSetitemKernel<<<dim.grid, dim.block>>>(a.ptr, out->ptr,
-                                                a.size, VecToCuda(shape), VecToCuda(strides), offset,
+                                                a.size, VecToCuda(shape), StridesToCuda(strides), offset,
                                                 GetCarry(shape));
     /// END YOUR SOLUTION
 }
@@ -240,7 +264,7 @@ void EwiseSetitem(const CudaArray& a, CudaArray* out,
 
 /// BEGIN YOUR SOLUTION
 __global__ void ScalarSetitemKernel(scalar_t val, scalar_t* out,
-                                    size_t size, CudaVec shape, CudaVec strides, size_t offset,
+                                    size_t size, CudaVec shape, CudaStrides strides, size_t offset,
                                     CudaVec carry)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -251,7 +275,7 @@ __global__ void ScalarSetitemKernel(scalar_t val, scalar_t* out,
 /// END YOUR SOLUTION
 
 void ScalarSetitem(size_t size, scalar_t val, CudaArray* out,
-                   std::vector<uint32_t> shape, std::vector<uint32_t> strides, size_t offset)
+                   std::vector<uint32_t> shape, std::vector<int32_t> strides, size_t offset)
 {
     /**
      * Set items is a (non-compact) array
@@ -271,7 +295,7 @@ void ScalarSetitem(size_t size, scalar_t val, CudaArray* out,
     // see https://forum.dlsyscourse.org/t/q6-setitem-in-gpu-version/2641/3
     CudaDims dim = CudaOneDim(size);
     ScalarSetitemKernel<<<dim.grid, dim.block>>>(val, out->ptr,
-                                                 size, VecToCuda(shape), VecToCuda(strides), offset,
+                                                 size, VecToCuda(shape), StridesToCuda(strides), offset,
                                                  GetCarry(shape));
     /// END YOUR SOLUTION
 }

@@ -145,20 +145,20 @@ def test_flip_backward(params, device):
     backward_check(ndl.flip, ndl.Tensor(np.random.randn(*shape), device=device), axes=axes)
 
 
-# @pytest.mark.parametrize("device", _DEVICES)
-# def test_init_calculate_fans(device):
-#     _A = np.random.randn(3, 3, 16, 8)
-#     A = ndl.Tensor(_A, device=device)
-#     assert ndl.init._calculate_fans(A) == (144, 72)
+@pytest.mark.parametrize("device", _DEVICES)
+def test_init_calculate_fans(device):
+    _A = np.random.randn(3, 3, 16, 8)
+    A = ndl.Tensor(_A, device=device)
+    assert ndl.init._calculate_fans(A) == (144, 72)
 
-#     _A = np.random.randn(3, 3, 16, 8)
-#     A = ndl.Tensor(_A, device=device)
-#     assert ndl.init._calculate_fans(A) == (144, 72)
+    _A = np.random.randn(3, 3, 16, 8)
+    A = ndl.Tensor(_A, device=device)
+    assert ndl.init._calculate_fans(A) == (144, 72)
 
 
-#     _A = np.random.randn(16, 8)
-#     A = ndl.Tensor(_A, device=device)
-#     assert ndl.init._calculate_fans(A) == (16, 8)
+    _A = np.random.randn(16, 8)
+    A = ndl.Tensor(_A, device=device)
+    assert ndl.init._calculate_fans(A) == (16, 8)
 
 
 @pytest.mark.parametrize("device", _DEVICES)
@@ -275,18 +275,18 @@ def test_dilate_forward(device):
 
 
 dilate_backward_params = [
-    {"shape": (2, 5),          "d": 1, "axes": (0,)},
-    {"shape": (2, 5),          "d": 2, "axes": (1,)},
-    {"shape": (2, 5),          "d": 1, "axes": (0,1)},
-    {"shape": (2, 5),          "d": 0, "axes": (0,1)},
-    {"shape": (2, 3, 3, 4),     "d": 2, "axes": (0,1)},
-    {"shape": (3, 3, 6, 4),     "d": 3, "axes": (0,1)},
-    {"shape": (2, 3, 3, 4),     "d": 0, "axes": (1,2)},
-    {"shape": (2, 3, 3, 4),     "d": 1, "axes": (1,2)},
-    {"shape": (3, 3, 6, 4),     "d": 1, "axes": (1,2)},
-    {"shape": (2, 3, 3, 4),     "d": 1, "axes": (2,3)},
-    {"shape": (3, 3, 6, 4),     "d": 1, "axes": (2,3)},
-    {"shape": (2, 3, 3, 4),     "d": 1, "axes": (0,1,2,3)},
+    {"shape": (2, 5),       "d": 1, "axes": (0,)},
+    {"shape": (2, 5),       "d": 2, "axes": (1,)},
+    {"shape": (2, 5),       "d": 1, "axes": (0,1)},
+    {"shape": (2, 5),       "d": 0, "axes": (0,1)},
+    {"shape": (2, 3, 3, 4), "d": 2, "axes": (0,1)},
+    {"shape": (3, 3, 6, 4), "d": 3, "axes": (0,1)},
+    {"shape": (2, 3, 3, 4), "d": 0, "axes": (1,2)},
+    {"shape": (2, 3, 3, 4), "d": 1, "axes": (1,2)},
+    {"shape": (3, 3, 6, 4), "d": 1, "axes": (1,2)},
+    {"shape": (2, 3, 3, 4), "d": 1, "axes": (2,3)},
+    {"shape": (3, 3, 6, 4), "d": 1, "axes": (2,3)},
+    {"shape": (2, 3, 3, 4), "d": 1, "axes": (0,1,2,3)},
 ]
 @pytest.mark.parametrize("device", _DEVICES)
 @pytest.mark.parametrize("params", dilate_backward_params)
