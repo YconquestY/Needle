@@ -6,7 +6,7 @@ import numpy
 from needle import init
 
 from operator  import add    # for helper `sum_node_list` to sum a list of tensors
-from functools import reduce # without indroducing `dtype mismatch`
+from functools import reduce # without introducing `dtype mismatch`
 
 # needle version
 LAZY_MODE = False

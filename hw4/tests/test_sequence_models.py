@@ -21,11 +21,11 @@ _DEVICES = [ndl.cpu(), pytest.param(ndl.cuda(),
     marks=pytest.mark.skipif(not ndl.cuda().enabled(), reason="No GPU"))]
 
 
-BATCH_SIZES = [1, 15]
-INPUT_SIZES = [1, 11]
-HIDDEN_SIZES = [1, 12]
-BIAS = [True, False]
-INIT_HIDDEN = [True, False]
+BATCH_SIZES    = [1, 15]
+INPUT_SIZES    = [1, 11]
+HIDDEN_SIZES   = [1, 12]
+BIAS           = [True, False]
+INIT_HIDDEN    = [True, False]
 NONLINEARITIES = ['tanh', 'relu']
 @pytest.mark.parametrize("batch_size", BATCH_SIZES)
 @pytest.mark.parametrize("input_size", INPUT_SIZES)
@@ -48,8 +48,13 @@ def test_rnn_cell(batch_size, input_size, hidden_size, bias, init_hidden, nonlin
     model.W_ih = ndl.Tensor(model_.weight_ih.detach().numpy().transpose(), device=device)
     model.W_hh = ndl.Tensor(model_.weight_hh.detach().numpy().transpose(), device=device)
     if bias:
-        model.bias_ih = ndl.Tensor(model_.bias_ih.detach().numpy(), device=device)
-        model.bias_hh = ndl.Tensor(model_.bias_hh.detach().numpy(), device=device)
+        # The biases obtained from PyTorch are reshaped deliberately to
+        # (1, hidden_size) to match my design, which minimizes `reshape`
+        # operations.
+        #model.bias_ih = ndl.Tensor(model_.bias_ih.detach().numpy(), device=device)
+        model.bias_ih = ndl.Tensor(model_.bias_ih.detach().numpy().reshape(1, -1), device=device)
+        #model.bias_hh = ndl.Tensor(model_.bias_hh.detach().numpy(), device=device)
+        model.bias_hh = ndl.Tensor(model_.bias_hh.detach().numpy().reshape(1,-1), device=device)
     if init_hidden:
         h = model(ndl.Tensor(x, device=device), ndl.Tensor(h0, device=device))
     else:
@@ -99,7 +104,7 @@ def test_lstm_cell(batch_size, input_size, hidden_size, bias, init_hidden, devic
 
 
 SEQ_LENGTHS = [1, 13]
-NUM_LAYERS = [1, 2]
+NUM_LAYERS  = [1, 2]
 @pytest.mark.parametrize("seq_length", SEQ_LENGTHS)
 @pytest.mark.parametrize("num_layers", NUM_LAYERS)
 @pytest.mark.parametrize("batch_size", BATCH_SIZES)
@@ -124,8 +129,13 @@ def test_rnn(seq_length, num_layers, batch_size, input_size, hidden_size, bias, 
         model.rnn_cells[k].W_ih = ndl.Tensor(getattr(model_, f'weight_ih_l{k}').detach().numpy().transpose(), device=device)
         model.rnn_cells[k].W_hh = ndl.Tensor(getattr(model_, f'weight_hh_l{k}').detach().numpy().transpose(), device=device)
         if bias:
-            model.rnn_cells[k].bias_ih = ndl.Tensor(getattr(model_, f'bias_ih_l{k}').detach().numpy(), device=device)
-            model.rnn_cells[k].bias_hh = ndl.Tensor(getattr(model_, f'bias_hh_l{k}').detach().numpy(), device=device)
+            # The biases obtained from PyTorch are reshaped deliberately to
+            # (1, hidden_size) to match my design, which minimizes `reshape`
+            # operations.
+            #model.rnn_cells[k].bias_ih = ndl.Tensor(getattr(model_, f'bias_ih_l{k}').detach().numpy(), device=device)
+            model.rnn_cells[k].bias_ih = ndl.Tensor(getattr(model_, f'bias_ih_l{k}').detach().numpy().reshape(1,-1), device=device)
+            #model.rnn_cells[k].bias_hh = ndl.Tensor(getattr(model_, f'bias_hh_l{k}').detach().numpy(), device=device)
+            model.rnn_cells[k].bias_hh = ndl.Tensor(getattr(model_, f'bias_hh_l{k}').detach().numpy().reshape(1,-1), device=device)
     if init_hidden:
         output, h = model(ndl.Tensor(x, device=device), ndl.Tensor(h0, device=device))
     else:

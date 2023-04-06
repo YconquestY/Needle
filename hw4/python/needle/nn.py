@@ -341,18 +341,20 @@ class Conv(Module):
 
 
 class RNNCell(Module):
-    def __init__(self, input_size, hidden_size, bias=True, nonlinearity='tanh', device=None, dtype="float32"):
+    def __init__(self, input_size, hidden_size,
+                       bias=True, nonlinearity='tanh',
+                       device=None, dtype="float32"):
         """
         Applies an RNN cell with tanh or ReLU nonlinearity.
 
         Parameters:
-        input_size: The number of expected features in the input X
+        input_size : The number of expected features in the input X
         hidden_size: The number of features in the hidden state h
-        bias: If False, then the layer does not use bias weights
+        bias        : If FALSE, then the layer does not use bias weights
         nonlinearity: The non-linearity to use. Can be either 'tanh' or 'relu'.
 
         Variables:
-        W_ih: The learnable input-hidden weights of shape (input_size, hidden_size).
+        W_ih: The learnable input-hidden  weights of shape (input_size , hidden_size).
         W_hh: The learnable hidden-hidden weights of shape (hidden_size, hidden_size).
         bias_ih: The learnable input-hidden bias of shape (hidden_size,).
         bias_hh: The learnable hidden-hidden bias of shape (hidden_size,).
@@ -361,13 +363,33 @@ class RNNCell(Module):
         """
         super().__init__()
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        self.hidden_size = hidden_size
+        self.bias = bias
+        self.nonlinearity = nonlinearity
+        self.W_ih = Parameter(init.rand(input_size, hidden_size,
+                                        low=-np.sqrt(1. / hidden_size),
+                                        high=np.sqrt(1. / hidden_size),
+                                        device=device, dtype=dtype,
+                                        requires_grad=True))
+        self.W_hh = Parameter(init.rand(hidden_size, hidden_size,
+                                        low=-np.sqrt(1. / hidden_size),
+                                        high=np.sqrt(1. / hidden_size),
+                                        device=device, dtype=dtype,
+                                        requires_grad=True))
+        # To save memory, do not initialize biases if not required.
+        if bias:
+            self.bias_ih = Parameter(init.rand(*(1, hidden_size),
+                                               device=device, dtype=dtype,
+                                               requires_grad=True))
+            self.bias_hh = Parameter(init.rand(*(1, hidden_size),
+                                               device=device, dtype=dtype,
+                                               requires_grad=True))
         ### END YOUR SOLUTION
 
     def forward(self, X, h=None):
         """
         Inputs:
-        X of shape (bs, input_size): Tensor containing input features
+        X of shape (bs, input_size ): Tensor containing input features
         h of shape (bs, hidden_size): Tensor containing the initial hidden state
             for each element in the batch. Defaults to zero if not provided.
 
@@ -376,21 +398,42 @@ class RNNCell(Module):
             for each element in the batch.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        activation = ops.tanh if self.nonlinearity == 'tanh' else ops.relu
+        batch_size = X.shape[0]
+        # Instead of initializing a zero tensor when initial states are absent,
+        # we use branches to avoid unnecessary memory allocation.
+        if h and self.bias:
+            return activation(X @ self.W_ih +
+                              h @ self.W_hh + ops.broadcast_to(self.bias_ih,
+                                                               (batch_size, self.hidden_size))
+                                            + ops.broadcast_to(self.bias_hh,
+                                                               (batch_size, self.hidden_size)))
+        elif self.bias: # no initial state
+            return activation(X @ self.W_ih + ops.broadcast_to(self.bias_ih,
+                                                               (batch_size, self.hidden_size))
+                                            + ops.broadcast_to(self.bias_hh,
+                                                               (batch_size, self.hidden_size)))
+        elif h: # no bias
+            return activation(X @ self.W_ih + h @ self.W_hh)
+        else:
+            return activation(X @ self.W_ih)
         ### END YOUR SOLUTION
 
 
 class RNN(Module):
-    def __init__(self, input_size, hidden_size, num_layers=1, bias=True, nonlinearity='tanh', device=None, dtype="float32"):
+    def __init__(self, input_size, hidden_size,
+                       num_layers=1, bias=True, nonlinearity='tanh',
+                       device=None, dtype="float32"):
         """
         Applies a multi-layer RNN with tanh or ReLU non-linearity to an input sequence.
 
         Parameters:
-        input_size - The number of expected features in the input x
-        hidden_size - The number of features in the hidden state h
-        num_layers - Number of recurrent layers.
+        input_size   - The number of expected features in the input x
+        hidden_size  - The number of features in the hidden state h; identical
+                       for all layers.
+        num_layers   - Number of recurrent layers.
         nonlinearity - The non-linearity to use. Can be either 'tanh' or 'relu'.
-        bias - If False, then the layer does not use bias weights.
+        bias         - If FALSE, then the layer does not use bias weights.
 
         Variables:
         rnn_cells[k].W_ih: The learnable input-hidden weights of the k-th layer,
@@ -405,15 +448,28 @@ class RNN(Module):
         """
         super().__init__()
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        # used later in `forward`
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        self.rnn_cells = []
+        for k in range(num_layers):
+            input_size = input_size if k == 0 else hidden_size
+            self.rnn_cells.append(RNNCell(input_size=input_size,
+                                          hidden_size=hidden_size,
+                                          bias=bias,
+                                          nonlinearity=nonlinearity,
+                                          device=device,
+                                          dtype=dtype))
         ### END YOUR SOLUTION
 
     def forward(self, X, h0=None):
         """
         Inputs:
-        X of shape (seq_len, bs, input_size) containing the features of the input sequence.
-        h_0 of shape (num_layers, bs, hidden_size) containing the initial
-            hidden state for each element in the batch. Defaults to zeros if not provided.
+        X   of shape (seq_len, bs, input_size) containing the features of the
+            input sequence.
+        h_0 of shape (num_layers, bs, hidden_size) containing the initial hidden
+            state for each element in the batch. Defaults to zeros if not provided.
 
         Outputs
         output of shape (seq_len, bs, hidden_size) containing the output features
@@ -421,7 +477,30 @@ class RNN(Module):
         h_n of shape (num_layers, bs, hidden_size) containing the final hidden state for each element in the batch.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        #
+        # neat h and h0, X and H_l ?
+        #
+        H = ops.split(X, axis=0) # input
+        h_n = []                 # final hidden state
+        # provided initial state
+        if h0:
+            h0 = ops.split(h0, axis=0)
+        for k in range(self.num_layers):
+            # initialize hidden state
+            # If not provided, initial states are set to `None` rather than a
+            # zero tensor. This avoids unnecessary memory allocation and is
+            # handled by multiple branches in `RNNCell`.
+            h = h0[k] if h0 else None
+            H_l = [] # cell outputs of current layer
+            for t in range(X.shape[0]):
+                h = self.rnn_cells[k](ops.tuple_get_item(H, t), h) # cell output of current time step
+                H_l.append(h)
+            
+            H = ops.make_tuple(*H_l) # update input for next layer
+            h_n.append(h)            # log output
+        
+        return ops.stack(H,   axis=0), \
+               ops.stack(h_n, axis=0)
         ### END YOUR SOLUTION
 
 

@@ -1,9 +1,12 @@
 """Core data structures."""
 import needle
-from typing import List, Optional, NamedTuple, Tuple, Union
+from typing import Optional, List, NamedTuple, Tuple, Union, Dict
 from collections import namedtuple
 import numpy
 from needle import init
+
+from operator  import add    # for helper `sum_node_list` to sum a list of tensors
+from functools import reduce # without introducing `dtype mismatch
 
 # needle version
 LAZY_MODE = False
@@ -270,6 +273,20 @@ class Tensor(Value):
     def __str__(self):
         return self.realize_cached_data().__str__()
 
+    ### BEGIN YOUR SOLUTION
+    # This is useful in the backward pass of strided convolution, where (padded)
+    # dimensions are not neatly divisible by the stride. The dilated adjoint,
+    # when backpropagated, usually has a size larger than the original input.
+    # It is necessary to "crop" the gradient to match the input size.
+    #def __getitem__(self, index):
+    #    tensor = Tensor.__new__(Tensor)
+    #    tensor._init(op=None,
+    #                 inputs=None, # or `[self,]`
+    #                 cached_data=self.realize_cached_data()[index],
+    #                 requires_grad=False)
+    #    return tensor
+    ### END YOUR SOLUTION
+
     def __add__(self, other):
         if isinstance(other, Tensor):
             return needle.ops.EWiseAdd()(self, other)
@@ -328,6 +345,11 @@ class Tensor(Value):
 
     def transpose(self, axes=None):
         return needle.ops.Transpose(axes)(self)
+
+    ### BEGIN YOUR SOLUTION
+    def permute(self, axes=None):
+        return needle.ops.Permute(axes)(self)
+    ### END YOUR SOLUTION
 
     __radd__ = __add__
     __rmul__ = __mul__
@@ -399,11 +421,11 @@ def compute_gradient_of_variables(output_tensor, out_grad):
             # `.inputs` as an iterable. I deliberately always return a tuple
             # in `ops`, thus, there is no need to call `gradient_as_tuple`.
             for node_input, grad in zip(node.inputs,
-                                        node.op.gradient(node.grad, node)): # The gradient of an operation
-                if node_input not in node_to_output_grads_list:             # is deliberately set as a
-                    node_to_output_grads_list[node_input] = [grad]          # tuple even if there is a
-                else:                                                       # single gradient.
-                    node_to_output_grads_list[node_input].append(grad)
+                                        node.op.gradient_as_tuple(node.grad, node)):
+                if node_input not in node_to_output_grads_list:             # The gradient of an operation
+                    node_to_output_grads_list[node_input] = [grad]          # is deliberately set as a
+                else:                                                       # tuple even if there is a
+                    node_to_output_grads_list[node_input].append(grad)      # single gradient.
     ### END YOUR SOLUTION
 
 
@@ -451,9 +473,10 @@ def topo_sort_dfs(node, visited, topo_order):
 ##############################
 
 
-def sum_node_list(node_list):
-    """Custom sum function in order to avoid create redundant nodes in Python sum implementation."""
-    from operator import add
-    from functools import reduce
-
-    return reduce(add, node_list)
+#def sum_node_list(node_list):
+#    """Custom sum function in order to avoid create redundant nodes in Python sum implementation."""
+#    from operator import add
+#    from functools import reduce
+#
+#    return reduce(add, node_list)
+sum_node_list = lambda node_list : reduce(add, node_list)

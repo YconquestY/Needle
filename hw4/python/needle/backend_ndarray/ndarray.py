@@ -43,7 +43,9 @@ class BackendDevice:
     def rand(self, *shape, dtype="float32"):
         # note: numpy doesn't support types within standard random routines, and
         # .astype("float32") does work if we're generating a singleton
-        return NDArray(np.random.rand(*shape).astype(dtype), device=self)
+        #return NDArray(np.random.rand(*shape).astype(dtype), device=self)
+        a = np.random.rand(*shape).astype(dtype)
+        return NDArray(a, device=self)
 
     def one_hot(self, n, i, dtype="float32"):
         return NDArray(np.eye(n, dtype=dtype)[i], device=self)
@@ -235,7 +237,7 @@ class NDArray:
     def flat(self):
         return self.reshape((self.size,))
 
-    def reshape(self, new_shape):
+    def reshape(self, new_shape: tuple):
         """
         Reshape the matrix without copying memory.  This will return a matrix
         that corresponds to a reshaped array but points to the same memory as
@@ -249,14 +251,21 @@ class NDArray:
             new_shape (tuple): new shape of the array
 
         Returns:
-            NDArray : reshaped array; this will point to thep
+            NDArray : reshaped array; this will point to the same memory as the original NDArray.
         """
 
         ### BEGIN YOUR SOLUTION
+        size = prod(new_shape)
+        # shape inference
+        if -1 in new_shape:
+            new_shape = tuple(int(self.size / abs(size)) if   i == -1
+                                                         else i
+                                                         for  i in new_shape)
         # `self.size` is a getter of # of elements in a tensor.
-        if self.size != prod(new_shape):
+        elif self.size != size:
             raise ValueError('NDArray dimension mismatch')
-        elif not self.is_compact():
+
+        if not self.is_compact():
             raise ValueError('NDArray not compact')
         
         return self.as_strided(new_shape, self.compact_strides(new_shape))
@@ -313,7 +322,7 @@ class NDArray:
         ### BEGIN YOUR SOLUTION
         for i in range(self.ndim):
             assert new_shape[i] == self.shape[i] or self.shape[i] == 1, \
-                          f'NDArray {i}th dimension broadcasting error'
+                          f'NDArray {i}th dimension broadcasting error, {self.shape}'
         return self.as_strided(new_shape,
                                strides=tuple(self.strides[i] if   self.shape[i] != 1
                                                              else 0
@@ -531,7 +540,7 @@ class NDArray:
         """
 
         assert self.ndim == 2 and other.ndim == 2
-        assert self.shape[1] == other.shape[0]
+        assert self.shape[1] == other.shape[0], f'inner dimension: {self.shape[1]} != {other.shape[0]}'
 
         m, n, p = self.shape[0], self.shape[1], other.shape[1]
 
@@ -584,7 +593,9 @@ class NDArray:
             if isinstance(axis, (tuple, list)):
                 assert len(axis) == 1, "Only support reduction over a single axis"
                 axis = axis[0]
-
+            # Backend of Needle does not support negative indices.
+            if axis < 0:
+                axis = self.ndim + axis
             view = self.permute(
                 tuple([a for a in range(self.ndim) if a != axis]) + (axis,)
             )
