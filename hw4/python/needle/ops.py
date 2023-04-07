@@ -27,7 +27,7 @@ def make_tuple(*args):
 
 
 class TupleGetItem(TensorOp):
-    def __init__(self, index):
+    def __init__(self, index: int):
         self.index = index
 
     def __call__(self, a: TensorTuple, fold_const=True) -> Value:
@@ -141,8 +141,7 @@ class PowerScalar(TensorOp):
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
         return multiply(out_grad,
-                        mul_scalar(array_api.power(node.inputs[0],
-                                                   self.scalar - 1),
+                        mul_scalar(node.inputs[0] ** (self.scalar - 1),
                                    self.scalar))
         ### END YOUR SOLUTION
 
@@ -528,8 +527,11 @@ class Stack(TensorOp):
 
     def compute(self, args):
         ### BEGIN YOUR SOLUTION
-        #compare = lambda x, y : x == y
+        # Indexing a negative axis of a `TensorTuple` of tensors does not make
+        # sense.
+
         # check array size
+        #compare = lambda x, y : x == y
         #assert reduce(compare, map(lambda x : x.shape, args)), 'tensor dimension mismatch'
         shape = args[0].shape
         for tensor in args:
@@ -576,6 +578,10 @@ class Split(TensorTupleOp):
 
     def compute(self, A):
         ### BEGIN YOUR SOLUTION
+        # handle negative axis
+        if self.axis < 0:
+            self.axis += A.ndim
+        
         shape = A.shape[ :self.axis] + A.shape[self.axis+1: ]
         out = []
         for i in range(A.shape[self.axis]):

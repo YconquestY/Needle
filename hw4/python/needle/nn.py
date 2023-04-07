@@ -144,7 +144,7 @@ class ReLU(Module):
 class Tanh(Module):
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return ops.tanh(x)
         ### END YOUR SOLUTION
 
 
@@ -154,7 +154,9 @@ class Sigmoid(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return ops.power_scalar(ops.add_scalar(ops.exp(ops.negate(x)),
+                                               scalar=1.),
+                                scalar=-1.)
         ### END YOUR SOLUTION
 
 
@@ -363,9 +365,11 @@ class RNNCell(Module):
         """
         super().__init__()
         ### BEGIN YOUR SOLUTION
+        # used later in `forward`
         self.hidden_size = hidden_size
         self.bias = bias
         self.nonlinearity = nonlinearity
+
         self.W_ih = Parameter(init.rand(input_size, hidden_size,
                                         low=-np.sqrt(1. / hidden_size),
                                         high=np.sqrt(1. / hidden_size),
@@ -449,8 +453,8 @@ class RNN(Module):
         super().__init__()
         ### BEGIN YOUR SOLUTION
         # used later in `forward`
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
+        self.hidden_size = hidden_size # ?
+        self.num_layers  = num_layers
 
         self.rnn_cells = []
         for k in range(num_layers):
@@ -473,15 +477,12 @@ class RNN(Module):
 
         Outputs
         output of shape (seq_len, bs, hidden_size) containing the output features
-            (h_t) from the last layer of the RNN, for each t.
+               (h_t) from the last layer of the RNN, for each t.
         h_n of shape (num_layers, bs, hidden_size) containing the final hidden state for each element in the batch.
         """
         ### BEGIN YOUR SOLUTION
-        #
-        # neat h and h0, X and H_l ?
-        #
-        H = ops.split(X, axis=0) # input
-        h_n = []                 # final hidden state
+        H   = ops.split(X, axis=0) # input
+        h_n = []                   # final hidden states
         # provided initial state
         if h0:
             h0 = ops.split(h0, axis=0)
@@ -490,7 +491,7 @@ class RNN(Module):
             # If not provided, initial states are set to `None` rather than a
             # zero tensor. This avoids unnecessary memory allocation and is
             # handled by multiple branches in `RNNCell`.
-            h = h0[k] if h0 else None
+            h = ops.tuple_get_item(h0, k) if h0 else None
             H_l = [] # cell outputs of current layer
             for t in range(X.shape[0]):
                 h = self.rnn_cells[k](ops.tuple_get_item(H, t), h) # cell output of current time step
@@ -505,96 +506,226 @@ class RNN(Module):
 
 
 class LSTMCell(Module):
-    def __init__(self, input_size, hidden_size, bias=True, device=None, dtype="float32"):
+    def __init__(self, input_size, hidden_size,
+                       bias=True,
+                       device=None, dtype="float32"):
         """
         A long short-term memory (LSTM) cell.
 
         Parameters:
-        input_size - The number of expected features in the input X
+        input_size  - The number of expected features in the input X
         hidden_size - The number of features in the hidden state h
-        bias - If False, then the layer does not use bias weights
+        bias - If FALSE, then the layer does not use bias weights
 
         Variables:
-        W_ih - The learnable input-hidden weights, of shape (input_size, 4*hidden_size).
-        W_hh - The learnable hidden-hidden weights, of shape (hidden_size, 4*hidden_size).
-        bias_ih - The learnable input-hidden bias, of shape (4*hidden_size,).
-        bias_hh - The learnable hidden-hidden bias, of shape (4*hidden_size,).
+        W_ih - The learnable input-hidden  weights, of shape (input_size , 4 x hidden_size).
+        W_hh - The learnable hidden-hidden weights, of shape (hidden_size, 4 x hidden_size).
+        bias_ih - The learnable input-hidden  bias, of shape (4 x hidden_size,).
+        bias_hh - The learnable hidden-hidden bias, of shape (4 x hidden_size,).
 
         Weights and biases are initialized from U(-sqrt(k), sqrt(k)) where k = 1/hidden_size
         """
         super().__init__()
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        # used later in `forward`
+        self.hidden_size = hidden_size
+        self.bias = bias
+
+        self.W_ih = Parameter(init.rand(input_size, 4 * hidden_size,
+                                        low=-np.sqrt(1. / hidden_size),
+                                        high=np.sqrt(1. / hidden_size),
+                                        device=device, dtype=dtype,
+                                        requires_grad=True))
+        self.W_hh = Parameter(init.rand(hidden_size, 4 * hidden_size,
+                                        low=-np.sqrt(1. / hidden_size),
+                                        high=np.sqrt(1. / hidden_size),
+                                        device=device, dtype=dtype,
+                                        requires_grad=True))
+        if bias:
+            self.bias_ih = Parameter(init.rand(1, 4 * hidden_size,
+                                               device=device, dtype=dtype,
+                                               requires_grad=True))
+            self.bias_hh = Parameter(init.rand(1, 4 * hidden_size,
+                                               device=device, dtype=dtype,
+                                               requires_grad=True))
         ### END YOUR SOLUTION
 
 
     def forward(self, X, h=None):
         """
-        Inputs: X, h
-        X of shape (batch, input_size): Tensor containing input features
+        Inputs:
+        X of shape (bs, input_size): Tensor containing input features
         h, tuple of (h0, c0), with
             h0 of shape (bs, hidden_size): Tensor containing the initial hidden state
                 for each element in the batch. Defaults to zero if not provided.
-            c0 of shape (bs, hidden_size): Tensor containing the initial cell state
+            c0 of shape (bs, hidden_size): Tensor containing the initial cell   state
                 for each element in the batch. Defaults to zero if not provided.
 
         Outputs: (h', c')
-        h' of shape (bs, hidden_size): Tensor containing the next hidden state for each
-            element in the batch.
-        c' of shape (bs, hidden_size): Tensor containing the next cell state for each
-            element in the batch.
+        h' of shape (bs, hidden_size): Tensor containing the next hidden state
+            for each element in the batch.
+        c' of shape (bs, hidden_size): Tensor containing the next cell state
+            for each element in the batch.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        batch_size = X.shape[0]
+        # In my `LSTM.forward` implementation , `h` is alwasy a tuple. While
+        # `None` and `(,)` are regarded FALSE in Python, `(None,)` or `(None, None)`
+        # is considered TRUE.
+        def init(h):
+            if h is None:
+                return False
+            elif h == (None, None):
+                return False
+            else:
+                return True
+        # Instead of initializing a zero tensor when initial states are absent,
+        # we use branches to avoid unnecessary memory allocation.
+        out = None
+        i, f, g, o = None, None, None, None
+        hidden, cell = None, None
+        if init(h):
+            h = ops.make_tuple(*h)
+            hidden = ops.tuple_get_item(h, 0)
+            cell   = ops.tuple_get_item(h, 1)
+
+            if self.bias:
+                out = X      @ self.W_ih + \
+                      hidden @ self.W_hh + \
+                      ops.broadcast_to(self.bias_ih,
+                                       (batch_size, 4 * self.hidden_size)) + \
+                      ops.broadcast_to(self.bias_hh,
+                                       (batch_size, 4 * self.hidden_size))
+            else: # no bias
+                out = X      @ self.W_ih + \
+                      hidden @ self.W_hh
+        else:
+            if self.bias: # no initial states
+                out = X @ self.W_ih + \
+                      ops.broadcast_to(self.bias_ih,
+                                       (batch_size, 4 * self.hidden_size)) + \
+                      ops.broadcast_to(self.bias_hh,
+                                       (batch_size, 4 * self.hidden_size))
+            else:
+                out = X @ self.W_ih
+        # determine gates
+        out = ops.split(out, axis=1)
+        i   = Sigmoid()(ops.stack([ops.tuple_get_item(out, i) for i in range(self.hidden_size)],
+                                  axis=1))
+        # `f` is moved to the following TRUE branch to avoid unnecessary
+        # computation.
+        g = Tanh()(ops.stack([ops.tuple_get_item(out, i) for i in range(self.hidden_size * 2,
+                                                                        self.hidden_size * 3)],
+                             axis=1))
+        o = Sigmoid()(ops.stack([ops.tuple_get_item(out, i) for i in range(self.hidden_size * 3,
+                                                                           self.hidden_size * 4)],
+                                axis=1))
+        # determine cell and hidden states
+        if init(h):
+            f = Sigmoid()(ops.stack([ops.tuple_get_item(out, i) for i in range(self.hidden_size,
+                                                                               self.hidden_size * 2)],
+                          axis=1))
+            cell = ops.add(ops.multiply(f, cell),
+                           ops.multiply(i, g))
+            hidden = ops.multiply(o, Tanh()(cell))
+        else:
+            cell   = ops.multiply(i, g)
+            hidden = ops.multiply(o, Tanh()(cell))
+        
+        return (hidden, cell)
         ### END YOUR SOLUTION
 
 
 class LSTM(Module):
-    def __init__(self, input_size, hidden_size, num_layers=1, bias=True, device=None, dtype="float32"):
+    def __init__(self, input_size, hidden_size,
+                       num_layers=1, bias=True,
+                       device=None, dtype="float32"):
         super().__init__()
         """
-        Applies a multi-layer long short-term memory (LSTM) RNN to an input sequence.
+        Applies a multi-layer LSTM to an input sequence.
 
         Parameters:
-        input_size - The number of expected features in the input x
+        input_size  - The number of expected features in the input x
         hidden_size - The number of features in the hidden state h
-        num_layers - Number of recurrent layers.
-        bias - If False, then the layer does not use bias weights.
+        num_layers  - Number of recurrent layers.
+        bias        - If FALSE, then the layer does not use bias weights.
 
         Variables:
         lstm_cells[k].W_ih: The learnable input-hidden weights of the k-th layer,
-            of shape (input_size, 4*hidden_size) for k=0. Otherwise the shape is
-            (hidden_size, 4*hidden_size).
+            of shape (input_size, 4 x hidden_size) for k=0. Otherwise the shape is
+            (hidden_size, 4 x hidden_size).
         lstm_cells[k].W_hh: The learnable hidden-hidden weights of the k-th layer,
-            of shape (hidden_size, 4*hidden_size).
+            of shape (hidden_size, 4 x hidden_size).
         lstm_cells[k].bias_ih: The learnable input-hidden bias of the k-th layer,
-            of shape (4*hidden_size,).
+            of shape (4 x hidden_size,).
         lstm_cells[k].bias_hh: The learnable hidden-hidden bias of the k-th layer,
-            of shape (4*hidden_size,).
+            of shape (4 x hidden_size,).
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        # used later in `forward`
+        #self.hidden_size = hidden_size
+        self.num_layers  = num_layers
+
+        self.lstm_cells = []
+        for i in range(num_layers):
+            input_size = input_size if i == 0 else hidden_size
+            self.lstm_cells.append(LSTMCell(input_size=input_size,
+                                            hidden_size=hidden_size,
+                                            bias=bias,
+                                            device=device,
+                                            dtype=dtype))
         ### END YOUR SOLUTION
 
     def forward(self, X, h=None):
         """
         Inputs: X, h
-        X of shape (seq_len, bs, input_size) containing the features of the input sequence.
+        X of shape (seq_len, bs, input_size) containing the features of the
+          input sequence.
         h, tuple of (h0, c0) with
             h_0 of shape (num_layers, bs, hidden_size) containing the initial
                 hidden state for each element in the batch. Defaults to zeros if not provided.
-            c0 of shape (num_layers, bs, hidden_size) containing the initial
-                hidden cell state for each element in the batch. Defaults to zeros if not provided.
+            c0  of shape (num_layers, bs, hidden_size) containing the initial
+                cell   state for each element in the batch. Defaults to zeros if not provided.
 
         Outputs: (output, (h_n, c_n))
         output of shape (seq_len, bs, hidden_size) containing the output features
-            (h_t) from the last layer of the LSTM, for each t.
+               (h_t) from the last layer of the LSTM, for each t.
         tuple of (h_n, c_n) with
             h_n of shape (num_layers, bs, hidden_size) containing the final hidden state for each element in the batch.
-            h_n of shape (num_layers, bs, hidden_size) containing the final hidden cell state for each element in the batch.
+            c_n of shape (num_layers, bs, hidden_size) containing the final cell   state for each element in the batch.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        H = ops.split(X, axis=0) # input
+        h_n = []                 # final hidden states
+        c_n = []                 # final cell   states
+        # provided initial states
+        h0, c0 = None, None
+        if h:
+            h = ops.make_tuple(*h)
+            h0 = ops.split(ops.tuple_get_item(h, 0),
+                           axis=0)
+            c0 = ops.split(ops.tuple_get_item(h, 1),
+                           axis=0)
+        for k in range(self.num_layers):
+            # initialize hidden & cell states
+            # If not provided, initial states are set to `None` rather than a
+            # zero tensor. This avoids unnecessary memory allocation and is
+            # handled by multiple branches in `RNNCell`.
+            h = ops.tuple_get_item(h0, k) if h0 else None
+            c = ops.tuple_get_item(c0, k) if c0 else None
+            H_l = [] # hidden status of current layer
+            for t in range(X.shape[0]):
+                h, c = self.lstm_cells[k](ops.tuple_get_item(H, t), # output & cell states of current time step
+                                          (h, c))
+                H_l.append(h)            
+
+            H = ops.make_tuple(*H_l) # update input for next layer
+            h_n.append(h)            # log output
+            c_n.append(c)            # log cell state
+        
+        return (ops.stack(H, axis=0),
+                (ops.stack(h_n, axis=0),
+                 ops.stack(c_n, axis=0)))
         ### END YOUR SOLUTION
 
 
