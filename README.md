@@ -1,27 +1,25 @@
 # Needle
 
-An imperative deep learning framework with **customized GPU and CPU backend**.  
+An imperative deep learning framework with **customized GPU and CPU backend**.
 
-Ongoing project; **switch to the branch `hw` for details.**
+
+This is an ongoing project, and the `main` branch will **soon** be populated with code and demo. Go to the [`hw`](https://github.com/YconquestY/Needle/tree/hw) branch for now.
+
+## TODO
+
+- [ ] To refactor the codebase.<br>
+  Needle adopts a monolithic design, e.g., the NDArray backend for a device is in a single file. A modular design allows agile optimization of operators, layers, modules, etc.
+- [ ] To optimize the NDArray backend.<br>
+  [This summary](./backend.md) gathers a series of blog posts on maximizing the throughput of operators. Also refer to [*Programming Massively Parallel Processors*](https://www.elsevier.com/books/programming-massively-parallel-processors/hwu/978-0-323-91231-0) for more topics on CUDA. The goal is to **exceed the performance of official CUDA libraris** like [cuBLAS](https://developer.nvidia.com/cublas) with hand-crafted kernels in certain tasks.
+- [ ] To incorporate [`tcnn`](https://github.com/NVlabs/tiny-cuda-nn) as MLP intrinsics
+- [ ] To accelerate computational graph traversal with CUDA[^gunrock][^graphblast]
 
 ## References
 
-[10-414/714](https://dlsyscourse.org) *Deep Learning Systems* by [Carnegie Mellon University](https://www.cmu.edu)
+[^gunrock]: [*Gunrock: a high-performance graph processing library on the GPU*](https://dl.acm.org/doi/abs/10.1145/2851141.2851145)
 
-[CUDA SGEMM矩阵乘法优化笔记——从入门到cublas](https://zhuanlan.zhihu.com/p/518857175)
+[^graphblast]: [*GraphBLAST: A High-Performance Linear Algebra-based Graph Framework on the GPU*](https://dl.acm.org/doi/full/10.1145/3466795)
 
-[How To Optimize GEMM](https://github.com/flame/how-to-optimize-gemm)
+## Acknowledgement
 
-[Tiny CUDA NN](https://github.com/NVlabs/tiny-cuda-nn)
-```
-@software{tiny-cuda-nn,
-	author = {M\"uller, Thomas},
-	license = {BSD-3-Clause},
-	month = {4},
-	title = {{tiny-cuda-nn}},
-	url = {https://github.com/NVlabs/tiny-cuda-nn},
-	version = {1.6},
-	year = {2021}
-}
-```
-
+This project is inspired by [10-414/714](https://dlsyscourse.org) *Deep Learning Systems* by [Carnegie Mellon University](https://www.cmu.edu).
