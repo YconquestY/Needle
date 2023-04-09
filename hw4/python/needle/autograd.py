@@ -416,16 +416,12 @@ def compute_gradient_of_variables(output_tensor, out_grad):
         node.grad = sum_node_list(output_grads_list)
         # propagate grad to inputs
         if not node.is_leaf():
-            # Typically, one should call `Op.gradient_as_tuple` to convert the
-            # output of `….gradient` to a tuple so that it may be zipped with
-            # `.inputs` as an iterable. I deliberately always return a tuple
-            # in `ops`, thus, there is no need to call `gradient_as_tuple`.
             for node_input, grad in zip(node.inputs,
                                         node.op.gradient_as_tuple(node.grad, node)):
-                if node_input not in node_to_output_grads_list:             # The gradient of an operation
-                    node_to_output_grads_list[node_input] = [grad]          # is deliberately set as a
-                else:                                                       # tuple even if there is a
-                    node_to_output_grads_list[node_input].append(grad)      # single gradient.
+                if node_input not in node_to_output_grads_list:
+                    node_to_output_grads_list[node_input] = [grad]
+                else:
+                    node_to_output_grads_list[node_input].append(grad)
     ### END YOUR SOLUTION
 
 

@@ -100,7 +100,7 @@ def submit_cifar10():
 
 
 def submit_ptb():
-    # devices = [ndl.cpu(), ndl.cuda()] if ndl.cuda().enabled() else [ndl.cpu()]
+    #devices = [ndl.cpu(), ndl.cuda()] if ndl.cuda().enabled() else [ndl.cpu()]
     devices = [ndl.cpu(), ndl.cuda()]
 
     corpus = ndl.data.Corpus("data/ptb")

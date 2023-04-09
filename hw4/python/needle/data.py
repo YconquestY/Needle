@@ -265,6 +265,7 @@ class DataLoader:
         self.shuffle = shuffle
         self.batch_size = batch_size
         if not self.shuffle:
+            # see https://numpy.org/doc/stable/reference/generated/numpy.array_split.html
             self.ordering = np.array_split(
                 np.arange(len(dataset)), range(batch_size, len(dataset), batch_size)
             )
@@ -333,7 +334,10 @@ class Dictionary(object):
         Returns the word's unique ID.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        if word not in self.word2idx:
+            self.word2idx[word] = len(self.idx2word)
+            self.idx2word.append(word)
+        return self.word2idx[word]
         ### END YOUR SOLUTION
 
     def __len__(self):
@@ -341,7 +345,7 @@ class Dictionary(object):
         Returns the number of unique words in the dictionary.
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        return len(self.idx2word)
         ### END YOUR SOLUTION
 
 
@@ -353,12 +357,12 @@ class Corpus(object):
     def __init__(self, base_dir, max_lines=None):
         self.dictionary = Dictionary()
         self.train = self.tokenize(os.path.join(base_dir, 'train.txt'), max_lines)
-        self.test = self.tokenize(os.path.join(base_dir, 'test.txt'), max_lines)
+        self.test  = self.tokenize(os.path.join(base_dir, 'test.txt' ), max_lines)
 
     def tokenize(self, path, max_lines=None):
         """
         Input:
-        path - path to text file
+        path      - path to text file
         max_lines - maximum number of lines to read in
         Tokenizes a text file, first adding each word in the file to the dictionary,
         and then tokenizing the text file to a list of IDs. When adding words to the
@@ -368,13 +372,38 @@ class Corpus(object):
         ids: List of ids
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        assert self.dictionary.add_word('<eos>') == 0, "'<eso>' hardwired to ID 0"
+
+        def add_tokens(line, ids):
+            # `line` is guaranteed to be non-empty.
+            for word in line.split():
+                ids.append(self.dictionary.add_word(word))
+            ids.append(0)
+        
+        ids = []
+        with open(path) as f:
+            # The effects of `max_lines` being 0 and `None` are equivalent.
+            # Both of them are considered FALSE.
+            if max_lines:
+                for _ in range(max_lines):
+                    line = f.readline()
+                    if not line:
+                        break
+                    add_tokens(line, ids)
+            else:
+                line = f.readline()
+                # If `max_lines` exceeds the number of lines in the file,
+                # `readline` will return an empty string.
+                while line:
+                    add_tokens(line, ids)
+                    line = f.readline()
+        return ids
         ### END YOUR SOLUTION
 
 
 def batchify(data, batch_size, device, dtype):
     """
-    Starting from sequential data, batchify arranges the dataset into columns.
+    Starting from sequential data, `batchify` arranges the dataset into columns.
     For instance, with the alphabet as the sequence and batch size 4, we'd get
     ┌ a g m s ┐
     │ b h n t │
@@ -382,36 +411,47 @@ def batchify(data, batch_size, device, dtype):
     │ d j p v │
     │ e k q w │
     └ f l r x ┘.
-    These columns are treated as independent by the model, which means that the
-    dependence of e. g. 'g' on 'f' cannot be learned, but allows more efficient
+    These columns are treated as independent by the model, which means, e.g.,
+    that the dependence of 'g' on 'f' cannot be learned, but allows more efficient
     batch processing.
     If the data cannot be evenly divided by the batch size, trim off the remainder.
-    Returns the data as a numpy array of shape (nbatch, batch_size).
+    Returns the data as a NumPy array of shape (nbatch, batch_size).
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    # see https://numpy.org/doc/stable/reference/generated/numpy.array_split.html
+    get_chunks = lambda data, batch_size: np.array_split(data,
+                                                         batch_size)
+    size = len(data)
+    trim = size % batch_size
+    # `device` not applicable to NumPy calls.
+    return np.array(list(get_chunks(data[ : size - trim],
+                                    batch_size)),
+                         dtype=dtype).T
     ### END YOUR SOLUTION
 
 
 def get_batch(batches, i, bptt, device=None, dtype=None):
     """
-    get_batch subdivides the source data into chunks of length bptt.
-    If source is equal to the example output of the batchify function, with
-    a bptt-limit of 2, we'd get the following two Variables for i = 0:
+    subdivides the source data into chunks of length `bptt`
+    Given a bptt-limit 2 and the above output of `batchify`, we will get the
+    following two variables when `i` is 0:
     ┌ a g m s ┐ ┌ b h n t ┐
     └ b h n t ┘ └ c i o u ┘
-    Note that despite the name of the function, the subdivison of data is not
-    done along the batch dimension (i.e. dimension 1), since that was handled
-    by the batchify function. The chunks are along dimension 0, corresponding
-    to the seq_len dimension in the LSTM or RNN.
     Inputs:
-    batches - numpy array returned from batchify function
-    i - index
-    bptt - Sequence length
+    batches - NumPy array returned from batchify function
+    i       - index
+    bptt    - sequence length
     Returns:
-    data - Tensor of shape (bptt, bs) with cached data as NDArray
-    target - Tensor of shape (bptt*bs,) with cached data as NDArray
+    data   - tensor of shape (`bptt`       , `bs`) with NDArray as `cached_data`
+    target - tensor of shape (`bptt` x `bs`,     ) with NDArray as `cached_data`
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    return Tensor(array=batches[i : i + bptt],
+                  device=device,
+                  dtype=dtype,
+                  requires_grad=False), \
+           Tensor(array=batches[i + 1 : i + 1 + bptt].flatten(),
+                  device=device,
+                  dtype=dtype,
+                  requires_grad=False)
     ### END YOUR SOLUTION
