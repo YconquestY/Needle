@@ -25,8 +25,12 @@ class SGD(Optimizer):
     def step(self):
         ### BEGIN YOUR SOLUTION
         for p in self.params:
-            #if p.grad is None:
-            #    continue
+            # It is necessary to check if a parameter has a gradient since it
+            # may not constitute the computational graph. This happens when
+            # multiplying a parameter with 0, which is simply weeded out in
+            # code using branches.
+            if p.grad is None:
+                continue
             p_id = id(p)
             grad = (1. - self.momentum) * (p.grad.data + self.weight_decay * p.data) + \
                    self.momentum * self.u.get(p_id, 0.)
@@ -70,8 +74,12 @@ class Adam(Optimizer):
         ### BEGIN YOUR SOLUTION
         self.t += 1
         for p in self.params:
-            #if p.grad is None:
-            #    continue
+            # It is necessary to check if a parameter has a gradient since it
+            # may not constitute the computational graph. This happens when
+            # multiplying a parameter with 0, which is simply weeded out in
+            # code using branches.
+            if p.grad is None:
+                continue
             p_id = id(p)
             grad = p.grad.data + self.weight_decay * p.data
             self.m[p_id] = self.beta1 * self.m.get(p_id, 0.) + (1. - self.beta1) * grad

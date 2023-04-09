@@ -733,18 +733,27 @@ class Embedding(Module):
     def __init__(self, num_embeddings, embedding_dim, device=None, dtype="float32"):
         super().__init__()
         """
-        Maps one-hot word vectors from a dictionary of fixed size to embeddings.
+        Maps one-hot word vectors from a fixed-size dictionary to embeddings.
 
         Parameters:
         num_embeddings (int) - Size of the dictionary
-        embedding_dim (int) - The size of each embedding vector
+        embedding_dim  (int) - The size of each embedding vector
 
         Variables:
         weight - The learnable weights of shape (num_embeddings, embedding_dim)
             initialized from N(0, 1).
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        #used later in `forward`
+        self.num_embeddings = num_embeddings
+        self.embedding_dim  = embedding_dim
+        self.device = device
+        self.dtype  = dtype
+
+        self.weight = Parameter(init.randn(num_embeddings, embedding_dim,
+                                           mean=0., std=1.,
+                                           device=device, dtype=dtype,
+                                           requires_grad=True))
         ### END YOUR SOLUTION
 
     def forward(self, x: Tensor) -> Tensor:
@@ -758,5 +767,18 @@ class Embedding(Module):
         output of shape (seq_len, bs, embedding_dim)
         """
         ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
+        # It is inefficient to generate one-hot vectors in Needle dialect.
+        # Instead, use NumPy.
+        indices = x.numpy().flatten().astype(np.int32) # Indices must be integers.
+        one_hot = np.zeros((indices.size, self.num_embeddings))
+        one_hot[np.arange(indices.size),
+                indices] = 1.
+        one_hot = Tensor(array=one_hot,
+                         device=self.device,
+                         dtype=self.dtype,
+                         requires_grad=False)
+        # Needle does not support "stacked" matrix multiplication for now.
+        return ops.reshape(ops.reshape(one_hot,
+                                       shape=(-1, self.num_embeddings)) @ self.weight,
+                           shape=(*x.shape, self.embedding_dim))
         ### END YOUR SOLUTION
