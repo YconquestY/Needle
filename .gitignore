@@ -2,8 +2,11 @@
 hw*/
 # lectures
 l*/
+# compilation
+*.so
 # editor
 .vscode/
 # cache
-.ipynb_checkpoint/
+.ipynb_checkpoints/
 __pycache__/
+

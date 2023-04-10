@@ -2,9 +2,6 @@
 
 An imperative deep learning framework with **customized GPU and CPU backend**.
 
-
-This is an ongoing project, and the `main` branch will **soon** be populated with code and demo. Go to the [`hw`](https://github.com/YconquestY/Needle/tree/hw) branch for now.
-
 ## TODO
 
 - [ ] To refactor the codebase<br>
