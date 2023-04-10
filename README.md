@@ -15,7 +15,7 @@ An imperative deep learning framework with **customized GPU and CPU backend**.
 
 ## Acknowledgement
 
-This project is inspired by [10-414/714](https://dlsyscourse.org) *Deep Learning Systems* by [Carnegie Mellon University](https://www.cmu.edu).
+This project is inspired by [10-414/714](https://dlsyscourse.org) *Deep Learning Systems* by [Carnegie Mellon University](https://www.cmu.edu). Switch to the branch [`hw`](https://github.com/YconquestY/Needle/tree/hw) for homework, [`proj`](https://github.com/YconquestY/Needle/tree/proj) for the course project, and [`lec`](https://github.com/YconquestY/Needle/tree/lec) for lectures.
 
 [^gunrock]: [*Gunrock: a high-performance graph processing library on the GPU*](https://dl.acm.org/doi/abs/10.1145/2851141.2851145)
 
